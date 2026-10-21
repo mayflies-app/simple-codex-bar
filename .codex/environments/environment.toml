@@ -1,0 +1,10 @@
+version = 1
+name = "SimpleCodexBar"
+
+[setup]
+script = ""
+
+[[actions]]
+name = "Run"
+icon = "run"
+command = "./scripts/app.py run"

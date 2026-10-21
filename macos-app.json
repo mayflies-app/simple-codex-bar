@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "product": "SimpleCodexBar",
+  "appName": "SimpleCodexBar",
+  "executable": "SimpleCodexBar",
+  "bundleIdentifier": "app.mayfiles.SimpleCodexBar",
+  "repository": "mayflies-app/simple-codex-bar",
+  "caskToken": "simplecodexbar",
+  "description": "Track Codex and ChatGPT account usage from the menu bar",
+  "minimumSystemVersion": "14.0",
+  "buildSystem": "swiftpm",
+  "architectures": [
+    "arm64",
+    "x86_64",
+    "universal"
+  ],
+  "releaseAdapter": "scripts/app.py",
+  "versionFile": "VERSION",
+  "paths": {
+    "sharedRelease": "scripts/lib/release",
+    "project": "SimpleCodexBar.xcodeproj"
+  },
+  "packaging": {
+    "resources": [
+      "LICENSE",
+      "NOTICE.md",
+      "Assets/AppIcon.icns",
+      "Resources/en.lproj",
+      "Resources/zh-Hans.lproj"
+    ],
+    "resourceBundles": [
+      "SimpleCodexBar_CodexUsageCore.bundle"
+    ],
+    "dependencyLicenses": [],
+    "infoPlist": "Resources/Info.plist"
+  },
+  "xcode": {
+    "scheme": "SimpleCodexBar"
+  },
+  "testScripts": [
+    "Tests/Tools/test_http_fixtures.py",
+    "Tests/Tools/test_native_wrapper.py"
+  ],
+  "nativeTests": {
+    "localizationScript": "Tests/Tools/verify_native.sh"
+  },
+  "shared": {
+    "designDestination": "Sources/SimpleCodexBar/MacAppDesign.swift",
+    "localizationDestination": "Sources/CodexUsageCore/LocalizationResources.swift"
+  }
+}
