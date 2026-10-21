@@ -7,9 +7,11 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "CodexUsageCore", targets: ["CodexUsageCore"]),
+        .executable(name: "SimpleCodexBar", targets: ["SimpleCodexBar"])
     ],
     targets: [
         .target(name: "CodexUsageCore", resources: [.process("Resources")]),
+        .executableTarget(name: "SimpleCodexBar", dependencies: ["CodexUsageCore"]),
         .testTarget(name: "CodexUsageCoreTests", dependencies: ["CodexUsageCore"]),
     ]
 )
