@@ -56,3 +56,14 @@ Tracked-input timestamps are reused only when content hashes, modes and checkout
 The app release workflow updates casks in [mayflies-app/homebrew-tap](https://github.com/mayflies-app/homebrew-tap). With publication enabled, it generates the `simplecodexbar` cask from the verified public Universal DMG and its SHA-256 checksum, with the macOS 14 minimum.
 
 Use the workflow's cask update path for new versions; preserve the bytes and identity of already published releases. See the tap's [distribution guide](https://github.com/mayflies-app/homebrew-tap/blob/main/docs/homebrew.md) for tap permissions and promotion checks.
+
+## Release Diagnostics
+
+Release logs identify stages, failure kinds and external exit codes, with credential-safe
+GitHub error annotations. See [shared release diagnostics](https://github.com/mayflies-app/homebrew-tap/blob/main/docs/homebrew.md#release-diagnostics)
+for authentication, authorization, repository access, network, concurrency and validation errors.
+Tap updates use `HOMEBREW_TAP_TOKEN`, separately from the app workflow token.
+
+A tap failure after successful publication leaves the release assets published. Repair
+the cask from those verified public assets; do not rebuild or replace the same version.
+Only confirmed concurrent push rejection is rebased and retried.
