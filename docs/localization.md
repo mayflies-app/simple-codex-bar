@@ -14,7 +14,7 @@ Preserve user-assigned account names and service-provided model or workspace nam
 
 Runtime translations live in `Sources/CodexUsageCore/Resources/en.lproj/` and `zh-Hans.lproj/`, grouped into `Panel.strings`, `Dialogs.strings` and `Core.strings`. Root `Resources/en.lproj/` and `Resources/zh-Hans.lproj/` contain bundle display strings.
 
-`LocalizationResources.swift` is shared source maintained in `homebrew-tap/templates/macos-app/shared/LocalizationResources.swift`. It prefers the resource bundle embedded in the running app, using the SwiftPM module bundle only when needed. Language directory lookup is case insensitive for both SwiftPM and Xcode output; formatted messages use the selected language’s locale.
+`LocalizationResources.swift` is shared source maintained in `macos-app-tooling/templates/macos-app/shared/LocalizationResources.swift`. It prefers the resource bundle embedded in the running app, using the SwiftPM module bundle only when needed. Language directory lookup is case insensitive for both SwiftPM and Xcode output; formatted messages use the selected language’s locale.
 
 Add the same semantic key to both languages and keep format arguments aligned. Resolve text through `LanguageController` or `LocalizedText` using the appropriate table. Use shared terms **Interface Language / 界面语言** and **Launch at Login / 登录时启动**. Use `SimpleCodexBar` for product identity, **Simple Codex Bar** for the English display name and **Codex 用量** for the Chinese display name.
 

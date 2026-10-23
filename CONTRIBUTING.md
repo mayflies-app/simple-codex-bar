@@ -12,7 +12,7 @@ Preserve read-only credential links, app-managed account ownership and account/w
 
 Preserve the adaptive panel, its top-edge anchor, visible footer Quit and menu-bar accessory behavior. Use isolated demo data for native checks. Keep upstream attribution in [NOTICE.md](NOTICE.md) and [LICENSE](LICENSE).
 
-Shared scripts, workflows, and declared design and localization helpers are maintained in `homebrew-tap/templates/macos-app`. This repository declares its repository-relative helper destinations in the `shared` object of `macos-app.json`; app configuration, translations, product behavior and targeted checks belong here. Update shared implementation in the tap and synchronize from its root with explicit app checkout arguments after reviewing local and staged changes. Do not commit host-specific paths or assume a workspace layout. See [Shared Maintenance](https://github.com/mayflies-app/homebrew-tap/tree/main/templates/macos-app#shared-maintenance).
+Shared scripts, workflows, and declared design and localization helpers are maintained in `macos-app-tooling/templates/macos-app`. This repository declares its repository-relative helper destinations in the `shared` object of `macos-app.json`; app configuration, translations, product behavior and targeted checks belong here. Update shared implementation in macos-app-tooling and synchronize from its root with explicit app checkout arguments after reviewing local and staged changes. Do not commit host-specific paths or assume a workspace layout. See [Shared Maintenance](https://github.com/mayflies-app/macos-app-tooling/tree/main/templates/macos-app#shared-maintenance).
 
 ## Validation
 
