@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 import Testing
 @testable import CodexUsageCore
 
@@ -75,4 +76,29 @@ private func shellQuote(_ value: String) -> String { "'" + value.replacingOccurr
     // A failed initializer must release its lock, not erase unknown user data.
     #expect(throws: UsageError.storage) { try AccountRepository(root: corrupt) }
     #expect(try String(contentsOf: corrupt.appendingPathComponent("accounts.json"), encoding: .utf8) == "not json")
+}
+
+@Test func repositoryReleaseUnlocksEvenWithAnInheritedDescriptor() throws {
+    let root = try testRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let inheritedFD: Int32 = try {
+        let repository = try AccountRepository(root: root)
+        let lockPath = repository.root.appendingPathComponent(".lock").path
+        var lockInfo = stat()
+        try #require(lstat(lockPath, &lockInfo) == 0)
+        let descriptors = try FileManager.default.contentsOfDirectory(atPath: "/dev/fd").compactMap(Int32.init)
+        let lockFD = try #require(descriptors.first { descriptor in
+            var info = stat()
+            return fstat(descriptor, &info) == 0 && info.st_dev == lockInfo.st_dev && info.st_ino == lockInfo.st_ino
+        })
+        // dup shares the open file description, just as inheritance before exec does.
+        return withExtendedLifetime(repository) { dup(lockFD) }
+    }()
+    try #require(inheritedFD >= 0)
+    defer { close(inheritedFD) }
+
+    // Releasing the owner must unlock immediately, while the inherited FD is still open.
+    let replacement = try AccountRepository(root: root)
+    #expect(throws: UsageError.alreadyRunning) { try AccountRepository(root: replacement.root) }
+    withExtendedLifetime(replacement) {}
 }

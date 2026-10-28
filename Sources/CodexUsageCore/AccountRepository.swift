@@ -47,13 +47,23 @@ public actor AccountRepository {
                 guard Set(initial.map(\.id)).count == initial.count,
                       Set(initial.map { $0.identity.key }).count == initial.count else { throw UsageError.storage }
             } else { initial = [] }
-        } catch { close(fd); close(directoryFD); throw UsageError.storage }
+        } catch {
+            // A child may inherit this descriptor before exec; close alone can leave its lock held.
+            flock(fd, LOCK_UN)
+            close(fd)
+            close(directoryFD)
+            throw UsageError.storage
+        }
         lockFD = fd
         rootFD = directoryFD
         saved = initial
     }
 
-    deinit { close(lockFD); close(rootFD) }
+    deinit {
+        flock(lockFD, LOCK_UN)
+        close(lockFD)
+        close(rootFD)
+    }
     public func accounts() -> [Account] { saved }
 
     private struct CachedUsage: Codable {
