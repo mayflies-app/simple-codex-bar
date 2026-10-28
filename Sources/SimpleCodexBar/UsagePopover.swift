@@ -111,16 +111,7 @@ struct UsagePopover: View {
                     } label: { Label(text("panel.add"), systemImage: "plus") }
                     .menuStyle(.borderlessButton).fixedSize()
                     .disabled(busy)
-                    if let version = appVersion {
-                        Text(text("app.version", version))
-                            .font(.system(size: 11)).foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity)
-                            .accessibilityIdentifier("app.version")
-                    } else {
-                        Spacer()
-                    }
+                    Spacer()
                     Button(text("panel.quit")) { NSApp.terminate(nil) }
                         .buttonStyle(.borderless).foregroundStyle(.secondary)
                         .accessibilityIdentifier("quit-app")
@@ -174,6 +165,11 @@ struct UsagePopover: View {
             Toggle(text("panel.dates.absolute"), isOn: Binding(get: { dates.absolute }, set: {
                 if $0 != dates.absolute { dates.toggle() }
             })).accessibilityIdentifier("absolute-dates")
+            if let version = appVersion {
+                Divider()
+                Text(text("app.version", version))
+                    .accessibilityIdentifier("app.version")
+            }
         } label: {
             Image(systemName: "gearshape").frame(width: 24, height: 24)
         }

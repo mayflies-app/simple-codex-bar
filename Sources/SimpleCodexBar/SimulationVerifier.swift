@@ -66,8 +66,11 @@ enum SimulationVerifier {
         try check(button.toolTip == "Codex 用量 · 查看账号额度"
                   && button.accessibilityLabel() == "Codex 多账号用量",
                   "Status-item tooltip and accessibility label start in Chinese")
-        try check(text("app.version", in: surface) == "版本 " + version,
-                  "Footer version matches the packaged app metadata in Chinese")
+        let chineseVersion = try withSettingsMenu(in: surface) { menu in
+            menu.items.last.flatMap { $0.isEnabled ? nil : $0.title }
+        }
+        try check(chineseVersion == "版本 " + version && find("app.version", in: surface, depth: 0) == nil,
+                  "Version appears as Chinese information at the bottom of Settings, without a footer label")
         let initialLogin = loginItem.enabled
         try check(try settingState("launch-at-login", in: surface) == initialLogin,
                   "Launch-at-login menu checkmark reflects the simulated service")
@@ -138,8 +141,11 @@ enum SimulationVerifier {
                 && !containsChinese(text("error-\(work.id)", in: surface))
                 && !containsChinese(text("window-title-\(work.id)-codex-weekly", in: surface))
         }
-        try check(text("app.version", in: surface) == "Version " + version,
-                  "Footer version updates immediately to English without changing bundle metadata")
+        let englishVersion = try withSettingsMenu(in: surface) { menu in
+            menu.items.last.flatMap { $0.isEnabled ? nil : $0.title }
+        }
+        try check(englishVersion == "Version " + version && find("app.version", in: surface, depth: 0) == nil,
+                  "Settings version updates immediately to English and stays out of the footer")
         try await waitUntil { button.toolTip == "Simple Codex Bar · View account usage"
             && button.accessibilityLabel() == "Codex usage for multiple accounts" }
         try check(button.toolTip == "Simple Codex Bar · View account usage"
