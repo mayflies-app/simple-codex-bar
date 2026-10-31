@@ -4,7 +4,6 @@
 "dialog.authFileReadOnly" = "The file will be linked without changing or copying your original credentials.";
 "dialog.demoTitle" = "Simple Codex Bar · Demo";
 "dialog.statusDescription" = "Codex usage for multiple accounts";
-"dialog.statusTooltip" = "Simple Codex Bar · View account usage";
 "dialog.rename" = "Account Name";
 "dialog.renameHeading" = "Set the account display name";
 "dialog.renamePlaceholder" = "For example: Personal / Work";

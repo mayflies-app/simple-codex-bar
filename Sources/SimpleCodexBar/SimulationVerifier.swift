@@ -63,9 +63,9 @@ enum SimulationVerifier {
         language.setLanguage(.simplifiedChinese)
         button.performClick(nil)
         try await waitUntil { panel.isVisible && containsChinese(text("panel-title", in: surface)) }
-        try check(button.toolTip == "Codex 用量 · 查看账号额度"
+        try check(button.toolTip == nil
                   && button.accessibilityLabel() == "Codex 多账号用量",
-                  "Status-item tooltip and accessibility label start in Chinese")
+                  "Status item has no tooltip and its accessibility label starts in Chinese")
         let chineseVersion = try withSettingsMenu(in: surface) { menu in
             menu.items.last.flatMap { $0.isEnabled ? nil : $0.title }
         }
@@ -146,11 +146,11 @@ enum SimulationVerifier {
         }
         try check(englishVersion == "Version " + version && find("app.version", in: surface, depth: 0) == nil,
                   "Settings version updates immediately to English and stays out of the footer")
-        try await waitUntil { button.toolTip == "Simple Codex Bar · View account usage"
+        try await waitUntil { button.toolTip == nil
             && button.accessibilityLabel() == "Codex usage for multiple accounts" }
-        try check(button.toolTip == "Simple Codex Bar · View account usage"
+        try check(button.toolTip == nil
                   && button.accessibilityLabel() == "Codex usage for multiple accounts",
-                  "Status-item tooltip and accessibility label update immediately to English")
+                  "Status item keeps no tooltip while its accessibility label updates immediately to English")
         try check(try pickerState("language-select", title: "简体中文", in: surface) == false,
                   "Chinese language choice keeps its own name in the English menu")
         let errorText = text("error-\(work.id)", in: surface)

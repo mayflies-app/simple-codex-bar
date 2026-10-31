@@ -183,7 +183,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidBecomeActive(_ notification: Notification) { loginItem?.reload() }
 
     private func updateLocalizedChrome() {
-        item?.button?.toolTip = language.text("dialog.statusTooltip", table: "Dialogs")
+        item?.button?.toolTip = nil
         item?.button?.setAccessibilityLabel(language.text("dialog.statusDescription", table: "Dialogs"))
         demoWindow?.title = language.text("dialog.demoTitle", table: "Dialogs")
         installMainMenu()

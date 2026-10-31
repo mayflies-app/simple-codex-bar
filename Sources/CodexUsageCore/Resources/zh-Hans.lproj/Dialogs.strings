@@ -4,7 +4,6 @@
 "dialog.authFileReadOnly" = "只读关联，不复制或修改原凭据。";
 "dialog.demoTitle" = "Codex 用量 · 模拟演示";
 "dialog.statusDescription" = "Codex 多账号用量";
-"dialog.statusTooltip" = "Codex 用量 · 查看账号额度";
 "dialog.rename" = "账号名称";
 "dialog.renameHeading" = "设置账号显示名称";
 "dialog.renamePlaceholder" = "例如：个人 / 工作";
