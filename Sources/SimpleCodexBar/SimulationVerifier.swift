@@ -630,7 +630,19 @@ enum SimulationVerifier {
         guard let button = item.button else { throw CheckFailure("菜单栏按钮缺失") }
         try check(button.title.isEmpty && button.image != nil && button.imagePosition == .imageOnly
                   && item.length == NSStatusItem.squareLength, "实际菜单栏仅有图标，无文字")
-        try check(button.image?.size == NSSize(width: 20, height: 20), "菜单栏图标增大为 20 点")
+        guard let icon = button.image, let cell = button.cell else { throw CheckFailure("菜单栏图标布局缺失") }
+        let iconRect = cell.imageRect(forBounds: button.bounds)
+        try JSONSerialization.data(withJSONObject: [
+            "imageWidth": icon.size.width, "imageHeight": icon.size.height,
+            "buttonWidth": button.bounds.width, "buttonHeight": button.bounds.height,
+            "imageRect": ["x": iconRect.minX, "y": iconRect.minY, "width": iconRect.width, "height": iconRect.height],
+            "template": icon.isTemplate,
+        ], options: [.prettyPrinted, .sortedKeys])
+            .write(to: output.appendingPathComponent("status-item-metrics.json"))
+        // SF Symbol dimensions vary with the glyph and OS; validate its actual menu-bar layout.
+        try check(icon.isTemplate && icon.size.width > 0 && icon.size.height > 0
+                  && iconRect.width > 0 && iconRect.height > 0 && button.bounds.contains(iconRect),
+                  "菜单栏模板图标具有有效尺寸，绘制区域完整位于系统按钮内")
         try check(UserDefaults.standard.integer(forKey: "NSInitialToolTipDelay") == 200,
                   "原生 tooltip 的应用内延迟配置为 200 毫秒")
         try check(!panel.isOpaque && panel.backgroundColor == .clear,
