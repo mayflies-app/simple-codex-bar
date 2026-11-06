@@ -1,5 +1,5 @@
 "panel.title" = "Codex 用量";
-"panel.activity.help" = "Mac 非活跃时暂停自动刷新；恢复使用后，若已超过刷新间隔则补刷。";
+"panel.activity.help" = "Mac 非活跃时暂停自动刷新；恢复使用后按各账号的动态排期和重置时间补刷。";
 "panel.language" = "界面语言";
 "panel.language.help" = "选择界面语言。";
 "panel.language.chinese" = "简体中文";
@@ -10,9 +10,11 @@
 "panel.refresh.help" = "立即刷新所有账号，包括已关闭自动刷新的账号";
 "panel.refresh.label" = "刷新所有账号";
 "panel.automatic" = "智能刷新";
-"panel.automatic.help" = "仅在 Mac 活跃时自动刷新；关闭后仍可手动刷新";
-"panel.interval" = "刷新间隔";
-"panel.interval.help" = "设置 Mac 活跃时的自动刷新间隔";
+"panel.automatic.help" = "仅在 Mac 活跃时，按各账号用量变化独立调整刷新间隔；关闭后仍可手动刷新";
+"panel.interval" = "每账号动态间隔：1–30 分钟";
+"panel.interval.help" = "从 5 分钟起步；用量变化时加快，无变化时逐步放缓，请求失败时退避。重置到期额外刷新一次。";
+"card.automatic.interval" = "自动 · %@";
+"card.automatic.interval.label" = "%@ 自动刷新，每 %@";
 "panel.launch" = "登录时启动";
 "panel.launch.help" = "登录 Mac 时自动启动 Codex 用量。";
 "panel.launch.approve" = "前往系统设置批准";

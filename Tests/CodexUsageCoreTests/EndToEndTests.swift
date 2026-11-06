@@ -43,7 +43,7 @@ private struct LoopbackTransport: HTTPTransport {
     let store = AccountStore(repository: repository,
                              fetcher: UsageService(repository: repository, transport: LoopbackTransport(base: base)))
     await store.load()
-    let refresh = RefreshController(defaults: nil, enabled: false) { store.refreshAll() }
+    let refresh = RefreshController(defaults: nil, enabled: false, accountStore: store)
     defer { refresh.stop() }
     refresh.start()
     refresh.handleWake()

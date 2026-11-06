@@ -73,8 +73,11 @@ struct UsagePopover: View {
                     ForEach(Array(store.rows.enumerated()), id: \.element.id) { index, row in
                         AccountCard(row: row, disabled: busy, dates: dates, language: language,
                                     canMoveUp: index > 0, canMoveDown: index < store.rows.count - 1,
-                                    staleAfter: refreshController.automaticRefreshEnabled ? max(600, refreshController.refreshInterval.seconds * 2) : 600,
-                                    refresh: { store.refresh(row.id) },
+                                    staleAfter: refreshController.automaticRefreshEnabled && row.account.automaticRefreshEnabled
+                                        ? max(600, refreshController.refreshInterval(for: row.id).seconds * 2) : 600,
+                                    automaticInterval: refreshController.automaticRefreshEnabled && row.account.automaticRefreshEnabled
+                                        ? refreshController.refreshInterval(for: row.id) : nil,
+                                    refresh: { refreshController.refreshManually(row.id) },
                                     setAutomatic: { enabled in Task { await store.setAutomaticRefreshEnabled(row.id, enabled: enabled) } },
                                     move: { offset in Task { await store.move(row.id, by: offset) } },
                                     reauthenticate: { reauthenticate(row.account) },
@@ -146,10 +149,7 @@ struct UsagePopover: View {
                                                         set: { refreshController.setAutomaticRefreshEnabled($0) }))
                 .accessibilityIdentifier("automatic-refresh")
                 .help(text("panel.automatic.help"))
-            Picker(text("panel.interval"), selection: Binding(get: { refreshController.refreshInterval },
-                                                            set: { refreshController.setRefreshInterval($0) })) {
-                ForEach(RefreshInterval.allCases) { interval in Text(interval.title(in: language.language)).tag(interval) }
-            }.pickerStyle(.menu)
+            Text(text("panel.interval"))
                 .accessibilityIdentifier("refresh-interval")
                 .help(text("panel.interval.help"))
             Divider()
@@ -233,6 +233,7 @@ private struct AccountCard: View {
     let canMoveUp: Bool
     let canMoveDown: Bool
     let staleAfter: TimeInterval
+    let automaticInterval: RefreshInterval?
     let refresh: () -> Void
     let setAutomatic: (Bool) -> Void
     let move: (Int) -> Void
@@ -358,11 +359,15 @@ private struct AccountCard: View {
                     }
                 }
                 Spacer(minLength: 0)
-                Toggle(text("card.automatic"), isOn: Binding(get: { row.account.automaticRefreshEnabled }, set: { setAutomatic($0) }))
+                Toggle(automaticInterval.map { text("card.automatic.interval", $0.title(in: language.language)) }
+                       ?? text("card.automatic"),
+                       isOn: Binding(get: { row.account.automaticRefreshEnabled }, set: { setAutomatic($0) }))
                     .toggleStyle(.switch).controlSize(.mini).fixedSize()
                     .disabled(disabled)
                     .help(text("card.automatic.help"))
-                    .accessibilityLabel(text("card.automatic.label", row.account.displayName(in: language.language)))
+                    .accessibilityLabel(automaticInterval.map {
+                        text("card.automatic.interval.label", row.account.displayName(in: language.language), $0.title(in: language.language))
+                    } ?? text("card.automatic.label", row.account.displayName(in: language.language)))
                     .accessibilityIdentifier("automatic-account-\(row.id)")
                 Button { move(-1) } label: { Image(systemName: "arrow.up").frame(width: 16, height: 18) }
                     .disabled(disabled || !canMoveUp).help(text("card.move.up.help"))

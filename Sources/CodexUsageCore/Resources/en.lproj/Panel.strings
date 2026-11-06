@@ -1,5 +1,5 @@
 "panel.title" = "Codex Usage";
-"panel.activity.help" = "Automatic refresh pauses while your Mac is inactive. On return, usage refreshes if the interval has elapsed.";
+"panel.activity.help" = "Automatic refresh pauses while your Mac is inactive. On return, each account catches up according to its adaptive schedule and reset deadlines.";
 "panel.language" = "Interface Language";
 "panel.language.help" = "Choose the interface language.";
 "panel.language.chinese" = "简体中文";
@@ -10,9 +10,11 @@
 "panel.refresh.help" = "Refresh every account now, including accounts with automatic refresh turned off.";
 "panel.refresh.label" = "Refresh all accounts";
 "panel.automatic" = "Smart refresh";
-"panel.automatic.help" = "Refresh automatically while your Mac is active. Manual refresh remains available when turned off.";
-"panel.interval" = "Refresh interval";
-"panel.interval.help" = "Set the automatic refresh interval while your Mac is active.";
+"panel.automatic.help" = "Adapt each account's refresh interval to usage changes while your Mac is active; manual refresh remains available when disabled.";
+"panel.interval" = "Per-account intervals: 1–30 minutes";
+"panel.interval.help" = "Start at 5 minutes, speed up when usage changes, slow down when unchanged, and back off after failures. Refresh once more at reset time.";
+"card.automatic.interval" = "Auto · %@";
+"card.automatic.interval.label" = "Automatic refresh for %@, every %@";
 "panel.launch" = "Launch at Login";
 "panel.launch.help" = "Start Simple Codex Bar automatically when you log in to your Mac.";
 "panel.launch.approve" = "Approve in System Settings";

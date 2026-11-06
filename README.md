@@ -46,7 +46,9 @@ Account menus provide rename, sign-in and removal. Use the arrows to change acco
 
 ### Refresh and settings
 
-Refresh every account with the header button or one account with its card button. Smart Refresh controls automatic requests, with a separate switch for each account. Automatic refresh pauses during lock, sleep, inactive sessions, display sleep or five minutes without input. A closed lid pauses it unless an external display is awake. Returning refreshes readings when the interval has elapsed.
+Refresh every account with the header button or one account with its card button. Smart Refresh schedules each account independently, starting at 5 minutes. Usage changes shorten that account's interval to 1 minute; unchanged readings gradually slow it to 2, 5, 15 and at most 30 minutes. Failures back off independently without discarding valid readings or accelerating a quiet account. Each card shows its current interval beside its automatic-refresh switch. The former global fixed-interval setting is no longer used; adaptive state starts fresh when the app relaunches.
+
+Each account also refreshes once at its reported reset time, without shifting its regular schedule; a failed reset-time request waits for its next regular refresh. Automatic refresh pauses during lock, sleep, inactive sessions, display sleep or five minutes without input. A closed lid pauses it unless an external display is awake. Returning refreshes only accounts whose individual schedules or reset deadlines are due. Manual refresh remains available with either the global or account switch turned off.
 
 Click a reset or update time to switch between relative times and local dates. In Settings, choose **简体中文** or **English** under **Interface Language** to update the interface immediately. **Launch at Login** uses macOS Login Items and may require approval in System Settings.
 

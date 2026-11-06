@@ -96,9 +96,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 monitor?.currentState() ?? .sessionInactive
             }
             let refresh = RefreshController(defaults: demo ? fixtureDefaults : .standard,
+                                            accountStore: model,
                                             now: { [weak self] in self?.simulation?.refreshDate ?? Date() },
-                                            activityProvider: activityProvider,
-                                            onManualRefresh: { model.refreshAll() }) { model.refreshAutomatically() }
+                                            activityProvider: activityProvider)
             refreshController = refresh
             if !demo { monitor.start() }
             let loginItem = LoginItemController(service: demo ? SimulationLoginItemService() : SystemLoginItemService())

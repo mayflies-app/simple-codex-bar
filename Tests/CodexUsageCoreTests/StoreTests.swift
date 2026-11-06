@@ -45,7 +45,7 @@ private actor DelayedFetcher: UsageFetching {
     let fetcher = DelayedFetcher()
     let store = AccountStore(repository: repository, fetcher: fetcher)
     await store.load()
-    let refresh = RefreshController(defaults: nil) { store.refreshAll() }
+    let refresh = RefreshController(defaults: nil, accountStore: store)
     defer { refresh.stop() }
     refresh.start()
     while !(await fetcher.started()) { await Task.yield() }

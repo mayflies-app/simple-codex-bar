@@ -66,6 +66,50 @@ enum SimulationVerifier {
         try check(button.toolTip == nil
                   && button.accessibilityLabel() == "Codex 多账号用量",
                   "Status item has no tooltip and its accessibility label starts in Chinese")
+        let adaptiveAccount = session.store.rows[0].id
+        try await waitUntil { text("automatic-account-\(adaptiveAccount)", in: surface).contains("5 分钟") }
+        try check(refresh.refreshInterval(for: adaptiveAccount) == .fiveMinutes,
+                  "Account starts with its own five-minute interval and exposes it to accessibility")
+        try NativeCapture.write(surface, to: output.appendingPathComponent("adaptive-chinese-panel.png"))
+        try selectLanguage(.english, in: surface)
+        try await waitUntil { text("automatic-account-\(adaptiveAccount)", in: surface).contains("every 5 minutes") }
+        try NativeCapture.write(surface, to: output.appendingPathComponent("adaptive-english-panel.png"))
+        try check(true, "Account interval label immediately switches to English")
+        try selectLanguage(.simplifiedChinese, in: surface)
+        try await waitUntil { text("automatic-account-\(adaptiveAccount)", in: surface).contains("5 分钟") }
+        let otherAccount = session.store.rows[1].id
+        let initialUsage = session.store.rows.map(\.snapshot)
+        session.advanceRefreshClock(by: 300)
+        refresh.handleWake()
+        try await waitUntil {
+            !session.store.isRefreshing && session.store.rows[0].snapshot != initialUsage[0]
+                && session.store.rows[1].snapshot != initialUsage[1]
+                && refresh.refreshInterval(for: adaptiveAccount) == .oneMinute
+                && refresh.refreshInterval(for: otherAccount) == .oneMinute
+        }
+        try check(text("automatic-account-\(adaptiveAccount)", in: surface).contains("1 分钟"),
+                  "Usage changes accelerate the account schedule and its visible label to one minute")
+        try NativeCapture.write(surface, to: output.appendingPathComponent("adaptive-active-panel.png"))
+        try press("automatic-account-\(adaptiveAccount)", in: surface)
+        try await waitUntil { !session.store.rows[0].account.automaticRefreshEnabled }
+        let pausedUsage = session.store.rows.map(\.snapshot)
+        refresh.setActivity(.locked)
+        session.advanceRefreshClock(by: 61)
+        refresh.handleWake()
+        try await Task.sleep(for: .milliseconds(150))
+        try check(session.store.rows.map(\.snapshot) == pausedUsage && !session.store.isRefreshing,
+                  "Inactive Mac pauses all adaptive requests even when individual schedules are due")
+        refresh.setActivity(.active)
+        try await waitUntil { !session.store.isRefreshing && session.store.rows[1].snapshot != pausedUsage[1] }
+        try check(session.store.rows[0].snapshot == pausedUsage[0],
+                  "Resume refreshes the due enabled account and leaves the opted-out account untouched")
+        let otherNext = refresh.nextRefreshAt(for: otherAccount)
+        try press("refresh-account-\(adaptiveAccount)", in: surface)
+        try await waitUntil { !session.store.isRefreshing && session.store.rows[0].snapshot != pausedUsage[0] }
+        try check(refresh.nextRefreshAt(for: otherAccount) == otherNext,
+                  "Native card refresh works while opted out and preserves the other account's next deadline")
+        try press("automatic-account-\(adaptiveAccount)", in: surface)
+        try await waitUntil { session.store.rows[0].account.automaticRefreshEnabled }
         let chineseVersion = try withSettingsMenu(in: surface) { menu in
             menu.items.last.flatMap { $0.isEnabled ? nil : $0.title }
         }
@@ -87,17 +131,17 @@ enum SimulationVerifier {
         try await waitUntil { !refresh.automaticRefreshEnabled }
         try check(try !settingState("automatic-refresh", in: surface), "Smart refresh menu checkmark clears when disabled")
         let readingsWhileDisabled = session.store.rows.map(\.snapshot)
-        try selectInterval("15 分钟", in: surface)
-        try await waitUntil { refresh.refreshInterval == .fifteenMinutes }
-        try check(try pickerState("refresh-interval", title: "15 分钟", in: surface),
-                  "Refresh interval submenu checks the selected option")
+        try check(try withSettingsMenu(in: surface) { menu in
+            let info = try settingItem("refresh-interval", in: menu)
+            return info.title == "每账号动态间隔：1–30 分钟" && info.submenu == nil && !info.isEnabled
+        }, "Settings explains per-account adaptive intervals without a fixed-interval picker")
         try check(session.store.rows.map(\.snapshot) == readingsWhileDisabled && !session.store.isRefreshing,
-                  "Changing interval while smart refresh is disabled does not fetch usage")
+                  "Inspecting adaptive refresh information does not fetch usage")
         try press("automatic-refresh", in: surface)
         try await waitUntil { refresh.automaticRefreshEnabled && !session.store.isRefreshing
             && session.store.rows[0].snapshot != readingsWhileDisabled[0] }
-        try check(refresh.refreshInterval == .fifteenMinutes && (try settingState("automatic-refresh", in: surface)),
-                  "Enabling smart refresh retains the selected interval and restores its checkmark")
+        try check(try settingState("automatic-refresh", in: surface),
+                  "Enabling smart refresh restores its checkmark")
         try press("automatic-refresh", in: surface)
         try await waitUntil { !refresh.automaticRefreshEnabled }
 
@@ -116,7 +160,7 @@ enum SimulationVerifier {
         try check(try pickerState("language-select", title: "简体中文", in: surface),
                   "Language submenu initially checks Simplified Chinese")
         try writeSettingsHierarchy(in: surface, to: output.appendingPathComponent("chinese-settings-menu.json"))
-        try check(panel.isVisible, "Settings toggles, interval selection and menu dismissal keep the status panel open")
+        try check(panel.isVisible, "Settings toggles and menu dismissal keep the status panel open")
         let personal = session.store.rows[0].account
         let work = session.store.rows[1].account
         let originalAccounts = session.store.rows.map(\.account)
@@ -156,8 +200,10 @@ enum SimulationVerifier {
         let errorText = text("error-\(work.id)", in: surface)
         try check(try pickerState("language-select", title: "English", in: surface),
                   "Language submenu checks English after the native menu selection")
-        try check(try pickerState("refresh-interval", title: "15 minutes", in: surface),
-                  "Refresh interval selection survives translation of the native settings menu")
+        try check(try withSettingsMenu(in: surface) { menu in
+            let info = try settingItem("refresh-interval", in: menu)
+            return info.title == "Per-account intervals: 1–30 minutes" && info.submenu == nil && !info.isEnabled
+        }, "Adaptive refresh explanation immediately switches to English")
         try writeSettingsHierarchy(in: surface, to: output.appendingPathComponent("english-settings-menu.json"))
         try check(panel.isVisible, "Selecting a language in the native settings menu keeps the status panel open")
         try NativeCapture.write(surface, to: output.appendingPathComponent("english-panel.png"))
@@ -721,7 +767,7 @@ enum SimulationVerifier {
         try await Task.sleep(for: .milliseconds(200))
         try check(store.rows.map(\.snapshot) == manualDuringPause, "非活跃时可以手动刷新，刚手动刷新后恢复活跃不重复查询")
         refresh.setActivity(.idle)
-        session.advanceRefreshClock(by: refresh.refreshInterval.seconds)
+        session.advanceRefreshClock(by: store.rows.map { refresh.refreshInterval(for: $0.id).seconds }.max() ?? 300)
         refresh.setActivity(.active)
         try await waitUntil { !store.isRefreshing && store.rows[0].snapshot != manualDuringPause[0] }
         try check(store.rows[1].snapshot != manualDuringPause[1], "空闲后恢复活跃且间隔已到，补刷当前账号")
@@ -737,7 +783,7 @@ enum SimulationVerifier {
         let optedOut = store.rows[0].snapshot
         let beforeWake = store.rows[1].snapshot
         refresh.setActivity(.sleeping)
-        session.advanceRefreshClock(by: refresh.refreshInterval.seconds)
+        session.advanceRefreshClock(by: store.rows.map { refresh.refreshInterval(for: $0.id).seconds }.max() ?? 300)
         refresh.setActivity(.active)
         try await waitUntil { !store.isRefreshing && store.rows[1].snapshot != beforeWake }
         try check(store.rows[0].snapshot == optedOut, "唤醒自动刷新跳过单独禁用的账号")
@@ -747,9 +793,8 @@ enum SimulationVerifier {
         try press("automatic-account-\(personal.id)", in: view)
         try await waitUntil { store.rows[0].account.automaticRefreshEnabled }
 
-        try selectInterval("1 分钟", in: view)
-        try await waitUntil { refresh.refreshInterval == .oneMinute }
-        try check(true, "通过原生下拉控件将自动刷新间隔设置为 1 分钟")
+        try await waitUntil { refresh.refreshInterval(for: personal.id) == .oneMinute }
+        try check(true, "用量变化后，该账号的动态间隔自动缩短到 1 分钟")
 
         try press("automatic-refresh", in: view)
         try await waitUntil { !refresh.automaticRefreshEnabled }
@@ -840,12 +885,11 @@ enum SimulationVerifier {
                   && reloaded.rows[0].snapshot == store.rows[0].snapshot && reloaded.rows[0].restoredFromCache, "重载账号保留名称与最新读数，并标注缓存")
 
         let beforeEnable = store.rows[0].snapshot
-        try selectInterval("15 分钟", in: view)
-        try await waitUntil { refresh.refreshInterval == .fifteenMinutes }
         try press("automatic-refresh", in: view)
         try await waitUntil { refresh.automaticRefreshEnabled && !store.isRefreshing && store.rows[0].snapshot != beforeEnable }
         try check(true, "通过原生开关重新开启自动刷新，立即更新当前账号")
-        try check(refresh.refreshInterval == .fifteenMinutes, "自动刷新关闭时仍可设置间隔，重新开启保留选择")
+        try check(refresh.refreshInterval(for: store.rows[0].id) == .oneMinute,
+                      "重新开启后，账号按最新用量变化独立调整间隔")
         let report: [String: Any] = [
             "passed": true, "checks": checks, "realAccountsAccessed": false,
             "panelMaterial": material.materialName,
@@ -975,7 +1019,8 @@ enum SimulationVerifier {
         func inspect() {
             guard let menu, !menu.items.isEmpty else { return }
             opened = (try? SimulationVerifier.settingItem("automatic-refresh", in: menu)) != nil
-                && (try? SimulationVerifier.settingItem("refresh-interval", in: menu))?.submenu != nil
+                && (try? SimulationVerifier.settingItem("refresh-interval", in: menu)) != nil
+                && (try? SimulationVerifier.settingItem("refresh-interval", in: menu))?.submenu == nil
                 && (try? SimulationVerifier.settingItem("language-select", in: menu))?.submenu != nil
             menu.cancelTrackingWithoutAnimation()
             self.menu = nil
@@ -1049,10 +1094,6 @@ enum SimulationVerifier {
             }
             NSApp.postEvent(event, atStart: false)
         }
-    }
-
-    private static func selectInterval(_ title: String, in view: NSView) throws {
-        try selectPicker("refresh-interval", title: title, in: view)
     }
 
     private static func selectLanguage(_ requested: AppLanguage, in view: NSView) throws {
@@ -1144,7 +1185,7 @@ enum SimulationVerifier {
         switch identifier {
         case "launch-at-login": titles = ["登录时启动", "Launch at Login"]
         case "automatic-refresh": titles = ["智能刷新", "Smart refresh"]
-        case "refresh-interval": titles = ["刷新间隔", "Refresh interval"]
+        case "refresh-interval": titles = ["每账号动态间隔：1–30 分钟", "Per-account intervals: 1–30 minutes"]
         case "language-select": titles = ["界面语言", "Interface Language"]
         case "absolute-dates": titles = ["显示完整日期", "Show full dates"]
         default: throw CheckFailure("未知设置菜单控件：\(identifier)")

@@ -7,11 +7,17 @@ public struct AccountRow: Identifiable, Sendable {
     public var errorMessage: LocalizedText?
     public var refreshing = false
     public var restoredFromCache = false
+    /// Runtime request identities let scheduling observe repeated failures and identical readings once.
+    public private(set) var refreshAttemptID: UUID?
+    public private(set) var completedRefreshID: UUID?
     public var id: UUID { account.id }
     public init(account: Account, snapshot: UsageSnapshot? = nil,
                 errorMessage: LocalizedText? = nil) {
         self.account = account; self.snapshot = snapshot; self.errorMessage = errorMessage
     }
+
+    fileprivate mutating func beginRefresh(_ id: UUID) { refreshAttemptID = id; refreshing = true }
+    fileprivate mutating func completeRefresh(_ id: UUID) { completedRefreshID = id }
 }
 
 @MainActor @Observable
@@ -79,7 +85,7 @@ public final class AccountStore {
         let account = rows[index].account
         let ticket = UUID()
         tickets[id] = ticket
-        rows[index].refreshing = true
+        rows[index].beginRefresh(ticket)
         tasks[id] = Task { [weak self] in
             let outcome: Result<UsageSnapshot, Error>
             do { outcome = .success(try await fetcher.fetch(account)) }
@@ -113,6 +119,7 @@ public final class AccountStore {
                 }
                 self.rows[index].errorMessage = ((error as? UsageError) ?? .network).message
             }
+            self.rows[index].completeRefresh(ticket)
             if let cacheMessage { self.storageMessage = cacheMessage }
             else if case .success = outcome, self.storageMessage == LocalizedText("storage.cache") {
                 self.storageMessage = nil
