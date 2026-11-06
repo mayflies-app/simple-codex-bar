@@ -330,6 +330,28 @@ private struct AccountCard: View {
                 Text(text(row.refreshing ? "card.loading" : "card.unavailable"))
                     .font(.caption).foregroundStyle(.secondary).padding(.vertical, 4)
             }
+            if let snapshot = row.snapshot {
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(snapshot.bankedResets.map { text("card.banked.available", String($0.availableCount(at: context.date))) }
+                             ?? text("card.banked.unavailable"))
+                            .monospacedDigit()
+                            .accessibilityIdentifier("banked-resets-\(row.id)")
+                        if let balance = snapshot.bankedResets,
+                           let first = balance.availableExpirations(at: context.date).first {
+                            Text(first.map { text("card.banked.expires", fullDate($0)) }
+                                 ?? text("card.banked.expiryUnavailable"))
+                                .accessibilityIdentifier("banked-expiry-\(row.id)")
+                                .help(balance.availableExpirations(at: context.date).map { date in
+                                    date.map { text("card.banked.expires", fullDate($0)) } ?? text("card.banked.expiryUnavailable")
+                                }.joined(separator: "\n"))
+                        }
+                    }
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .help(text("card.banked.help"))
+                }
+            }
             if let error = row.errorMessage {
                 Label(language.resolve(error), systemImage: "exclamationmark.triangle")
                     .font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)

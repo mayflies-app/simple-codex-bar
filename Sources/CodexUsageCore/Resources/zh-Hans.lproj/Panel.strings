@@ -48,6 +48,11 @@
 "card.actions.label" = "%@的操作";
 "card.plan.help" = "当前套餐：%@\n登录时套餐：%@";
 "card.not.provided" = "未提供";
+"card.banked.available" = "可用重置：%@ 次";
+"card.banked.unavailable" = "可用重置：暂不可用";
+"card.banked.expires" = "最近到期：%@";
+"card.banked.expiryUnavailable" = "未提供到期时间";
+"card.banked.help" = "仅只读查询。本应用绝不使用重置次数或修改账号用量额度。悬停到期时间可查看所有可用次数的到期信息。";
 "card.credits.help" = "Credit 额度，按原始单位显示，未换算为金额";
 "card.managed" = "独立登录";
 "card.linked" = "只读关联";

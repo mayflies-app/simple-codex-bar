@@ -109,14 +109,17 @@ public struct UsageSnapshot: Codable, Equatable, Sendable {
     public let noticeMessage: LocalizedText?
     public let credits: CreditBalance?
     public let authPlan: String?
+    public let bankedResets: BankedResets?
     public func displayNotice(in language: AppLanguage) -> String? {
         noticeMessage?.resolve(in: language) ?? notice
     }
     public init(plan: String?, windows: [UsageWindow], fetchedAt: Date = Date(), notice: String? = nil,
-                credits: CreditBalance? = nil, authPlan: String? = nil, noticeMessage: LocalizedText? = nil) {
+                credits: CreditBalance? = nil, authPlan: String? = nil, noticeMessage: LocalizedText? = nil,
+                bankedResets: BankedResets? = nil) {
         self.plan = plan; self.windows = windows; self.fetchedAt = fetchedAt; self.notice = notice
         self.credits = credits
         self.authPlan = authPlan
         self.noticeMessage = noticeMessage
+        self.bankedResets = bankedResets
     }
 }

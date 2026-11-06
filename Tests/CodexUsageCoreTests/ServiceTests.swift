@@ -36,7 +36,7 @@ func testRoot() throws -> URL {
     #expect(result.windows[0].remainingPercent == 77)
     #expect(try Data(contentsOf: file) == original)
     let requests = await http.recorded()
-    #expect(requests.count == 1)
+    #expect(requests.count == 2)
     #expect(requests[0].value(forHTTPHeaderField: "ChatGPT-Account-Id") == "workspace-a")
     #expect(requests[0].url?.absoluteString == "https://chatgpt.com/backend-api/wham/usage")
 }
@@ -62,7 +62,7 @@ func testRoot() throws -> URL {
     let saved = try await repo.readCredentials(account)
     #expect(saved.credentials.refreshToken == "rotated-private-token")
     let requests = await http.recorded()
-    #expect(requests.count == 2)
+    #expect(requests.count == 3)
     #expect(requests[0].url?.host == "auth.openai.com")
     #expect(requests[1].value(forHTTPHeaderField: "Authorization") == "Bearer \(freshAccess)")
     let metadata = try String(contentsOf: repo.root.appendingPathComponent("accounts.json"), encoding: .utf8)
@@ -215,7 +215,7 @@ private actor SourceChangingTransport: HTTPTransport {
     let service = UsageService(repository: repo, transport: http)
     let result = try await service.fetch(account)
     #expect(result.windows[0].remainingPercent == 77)
-    #expect(await http.calls() == 2)
+    #expect(await http.calls() == 3)
     #expect(try Data(contentsOf: file) == updated)
 }
 

@@ -173,7 +173,7 @@ private actor CacheFetcher: UsageFetching {
     try #require(timerFirings == 1)
     let snapshot = try #require(store.rows.first?.snapshot)
     #expect(store.rows.first?.errorMessage == nil && store.storageMessage == nil)
-    #expect(await transport.recorded().count == 1)
+    #expect(await transport.recorded().count == 2)
     #expect(!snapshot.windows.isEmpty)
     #expect(FileManager.default.fileExists(atPath: cache.path))
     #expect(try await repository.cachedUsage(for: account) == snapshot)

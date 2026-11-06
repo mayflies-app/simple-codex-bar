@@ -99,18 +99,42 @@ public struct UsageService: UsageFetching {
             catch let error as UsageError where error == .identityChanged { throw error }
             catch { noticeMessage = LocalizedText("notice.monthlyFailed") }
         }
-        guard !windows.isEmpty || payload.credits != nil else { throw UsageError.invalidResponse }
+        var bankedResets: BankedResets?
+        do {
+            let inventory = try await resetCredits(read.credentials)
+            guard (200..<300).contains(inventory.status) else { throw UsageError.http(inventory.status) }
+            bankedResets = try BankedResets.decode(inventory.data, expectedAccountID: account.identity.accountID)
+        } catch is CancellationError { throw CancellationError() }
+        catch let error as UsageError where error == .identityChanged { throw error }
+        catch { /* Optional read failed: retain main usage, with reset inventory unavailable. */ }
+        try Task.checkCancellation()
+        guard !windows.isEmpty || payload.credits != nil
+                || (bankedResets?.availableCount(at: Date()) ?? 0) > 0 else { throw UsageError.invalidResponse }
         let snapshot = UsageSnapshot(plan: payload.plan, windows: windows, fetchedAt: observedAt,
                                      notice: noticeMessage?.resolve(in: .simplifiedChinese),
                                      credits: payload.credits, authPlan: read.credentials.planHint,
-                                     noticeMessage: noticeMessage)
+                                     noticeMessage: noticeMessage, bankedResets: bankedResets)
         // Prevent a late response from appearing after a relogin, switch, or removal.
         try await repository.validatePublication(account, data: read.data)
         return snapshot
     }
 
     private func usage(_ credentials: Credentials) async throws -> HTTPResponse {
-        try await transport.send(authenticatedRequest(url: URL(string: "https://chatgpt.com/backend-api/wham/usage")!, credentials: credentials))
+        try await sendUsage(authenticatedRequest(url: URL(string: "https://chatgpt.com/backend-api/wham/usage")!, credentials: credentials))
+    }
+
+    private func sendUsage(_ request: URLRequest) async throws -> HTTPResponse {
+        try ReadOnlyUsageRequest.validate(request)
+        return try await transport.send(request)
+    }
+
+    private func resetCredits(_ credentials: Credentials) async throws -> HTTPResponse {
+        var request = authenticatedRequest(url: URL(string: "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits")!,
+                                           credentials: credentials, timeout: 4)
+        request.setValue("codex-1", forHTTPHeaderField: "OpenAI-Beta")
+        request.setValue("Codex Desktop", forHTTPHeaderField: "originator")
+        // Use the exact credential snapshot that won the main usage request; never renew on inventory failure.
+        return try await sendUsage(request)
     }
 
     private func authenticatedRequest(url: URL, credentials: Credentials, timeout: TimeInterval = 30) -> URLRequest {
@@ -130,7 +154,7 @@ public struct UsageService: UsageFetching {
               let url = URL(string: "https://chatgpt.com/backend-api/accounts/\(encoded)/spend-controls/current-user/monthly-usage") else {
             throw UsageError.invalidCredentials
         }
-        return try await transport.send(authenticatedRequest(url: url, credentials: credentials, timeout: 4))
+        return try await sendUsage(authenticatedRequest(url: url, credentials: credentials, timeout: 4))
     }
 
     private func refresh(_ account: Account, read: CredentialRead) async throws -> CredentialRead {

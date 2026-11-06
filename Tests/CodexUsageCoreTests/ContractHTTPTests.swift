@@ -50,6 +50,7 @@ private struct ContractLoopbackTransport: HTTPTransport {
     #expect(a.windows.map(\.remainingPercent) == [77, 39, 91, 80])
     #expect(a.windows.map(\.title) == ["5 小时", "每周", "Spark · 5 小时", "每月额度"])
     #expect(a.windows.last?.resetsAt == nil)
+    #expect(a.bankedResets?.availableCount(at: Date()) == 2)
     #expect(try await repo.readCredentials(account).credentials.refreshToken == "loopback-r1")
 
     var checks = ["single-flight across two services over real HTTP", "OAuth POST body and private rotation",
@@ -73,6 +74,20 @@ private struct ContractLoopbackTransport: HTTPTransport {
     #expect(partial.notice != nil)
     #expect(partial.windows[0].remainingPercent == 77)
     checks.append("monthly HTTP 503 preserves main quota and marks unavailable data")
+    for (scope, mismatch) in [("workspace-reset-failure", false), ("workspace-reset-identity", true)] {
+        let file = root.appendingPathComponent("\(scope).json")
+        let bytes = try authData(account: scope)
+        try bytes.write(to: file)
+        let linked = try await repo.addLinked(file: file, label: scope)
+        if mismatch {
+            await #expect(throws: UsageError.identityChanged) { try await service.fetch(linked) }
+        } else {
+            let reading = try await service.fetch(linked)
+            #expect(reading.windows.count == 3 && reading.bankedResets == nil)
+        }
+        #expect(try Data(contentsOf: file) == bytes)
+    }
+    checks.append("banked reset GET preserves main quota on failure and rejects foreign identity")
     let wrongFile = root.appendingPathComponent("wrong.json")
     try authData(account: "workspace-bad-identity").write(to: wrongFile)
     let wrong = try await repo.addLinked(file: wrongFile, label: "wrong identity")
@@ -91,12 +106,18 @@ private struct ContractLoopbackTransport: HTTPTransport {
     let gets = requests.filter { $0["fakeBearer"] as? Bool == true }
     #expect(gets.allSatisfy { $0["method"] as? String == "GET" && $0["accept"] as? String == "application/json"
         && $0["hasCookie"] as? Bool == false && $0["userAgent"] as? String == "SimpleCodexBar" })
+    let inventories = gets.filter { $0["path"] as? String == "/backend-api/wham/rate-limit-reset-credits" }
+    #expect(!inventories.isEmpty)
+    #expect(inventories.allSatisfy { $0["openaiBeta"] as? String == "codex-1"
+        && $0["originator"] as? String == "Codex Desktop" && $0["accountHeader"] as? String != nil })
+    #expect(requests.allSatisfy { $0["method"] as? String == "GET" || $0["path"] as? String == "/oauth/token" })
+    checks.append("reset inventory uses only account-scoped GET with upstream capability headers; no quota mutations")
     checks.append("ephemeral cookie-free GET headers and HTTP redirects blocked")
     let results = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        .deletingLastPathComponent().appendingPathComponent("TestResults")
+        .deletingLastPathComponent().appendingPathComponent("TestResults/banked-resets-\(UUID())")
     try FileManager.default.createDirectory(at: results, withIntermediateDirectories: true)
     let report: [String: Any] = ["passed": true, "checked": checks, "requests": requests,
-        "upstreamRevision": "9699239f0ddc16777c84e5cc6116e526e9a4f71a",
+        "upstreamRevision": "68f6f221a7c2cb3e51e0a4e09fd64e147decdc07",
         "realAccountsAccessed": false, "externalNetworkUsed": false,
         "timestamp": ISO8601DateFormatter().string(from: Date())]
     try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])

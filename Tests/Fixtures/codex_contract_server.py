@@ -37,6 +37,8 @@ class Handler(BaseHTTPRequestHandler):
                 "accept": self.headers.get("Accept"),
                 "userAgent": self.headers.get("User-Agent"),
                 "hasCookie": self.headers.get("Cookie") is not None,
+                "openaiBeta": self.headers.get("OpenAI-Beta"),
+                "originator": self.headers.get("originator"),
                 "fakeBearer": self.headers.get("Authorization", "").startswith(("Bearer header.", "Bearer mock-fresh.")),
                 **(extra or {}),
             })
@@ -89,6 +91,18 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(401, {"error": "fixture accepts fake bearer only"})
             return
         account = self.headers.get("ChatGPT-Account-Id", "")
+        if self.path == "/backend-api/wham/rate-limit-reset-credits":
+            if self.headers.get("OpenAI-Beta") != "codex-1" or self.headers.get("originator") != "Codex Desktop":
+                self.reply(400, {})
+            elif account == "workspace-reset-failure":
+                self.reply(503, {"error": "secret-sentinel-must-not-be-displayed"})
+            else:
+                self.reply(200, {"account_id": "foreign" if account == "workspace-reset-identity" else account,
+                                 "available_count": 2,
+                                 "credits": [{"status": "available", "expires_at": "2099-01-01T00:00:00.123456Z"},
+                                             {"status": "available", "expires_at": None},
+                                             {"status": "redeemed", "expires_at": None}]})
+            return
         if self.path.endswith("/monthly-usage"):
             expected_path = "/backend-api/accounts/" + account + "/spend-controls/current-user/monthly-usage"
             if self.path != expected_path:

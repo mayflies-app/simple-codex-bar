@@ -60,7 +60,7 @@ private actor RefreshBarrierTransport: HTTPTransport {
     let c = try await third.value
     #expect(b == c)
     #expect(await transport.counts().0 == 1)
-    #expect(await transport.counts().1 == 1)
+    #expect(await transport.counts().1 == 2) // Main quota plus one reset-inventory GET.
     #expect(try await repo.readCredentials(account).credentials.refreshToken == "rotated-once")
 }
 
@@ -93,7 +93,7 @@ private actor RefreshBarrierTransport: HTTPTransport {
     #expect(result.windows[0].remainingPercent == 80)
     let personal = MockTransport([.init(status: 200, data: Data(#"{"plan_type":"plus","spend_control":{},"rate_limit":{"primary_window":{"used_percent":23}}}"#.utf8))])
     _ = try await UsageService(repository: repo, transport: personal).fetch(account)
-    #expect(await personal.recorded().count == 1)
+    #expect(await personal.recorded().count == 2)
 }
 
 @Test func monthlyResponseScopeMismatchAndEncodedAccountPathStayIsolated() async throws {
@@ -244,10 +244,10 @@ private actor ShutdownFlag {
         #expect(snapshot.windows[0].remainingPercent == 77)
         if expectedCount == 2 { #expect(snapshot.windows.dropFirst().first?.remainingPercent == 80) }
         let requests = await transport.recorded()
-        #expect(requests.count == 2)
-        #expect(requests.last?.url?.path == "/backend-api/accounts/workspace-a/spend-controls/current-user/monthly-usage")
-        #expect(requests.last?.value(forHTTPHeaderField: "ChatGPT-Account-Id") == "workspace-a")
-        #expect(requests.last?.timeoutInterval == 4)
+        #expect(requests.count == 3)
+        #expect(requests[1].url?.path == "/backend-api/accounts/workspace-a/spend-controls/current-user/monthly-usage")
+        #expect(requests[1].value(forHTTPHeaderField: "ChatGPT-Account-Id") == "workspace-a")
+        #expect(requests[1].timeoutInterval == 4)
     }
 }
 
@@ -278,5 +278,5 @@ private actor MetadataChangingTransport: HTTPTransport {
     let transport = MetadataChangingTransport(file: file, fresh: try refreshFixture())
     let result = try await UsageService(repository: repo, transport: transport).fetch(account)
     #expect(result.windows[0].remainingPercent == 77)
-    #expect(await transport.count() == 4)
+    #expect(await transport.count() == 5)
 }

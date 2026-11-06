@@ -64,6 +64,16 @@ final class SimulationSession {
         store.refresh(work.id)
     }
 
+    func failNextResetRefresh(_ account: Account) async {
+        await transport.failNextReset(account.identity.accountID)
+        store.refresh(account.id)
+    }
+
+    func resetOnlyNextRefresh(_ account: Account) async {
+        await transport.resetOnlyNext(account.identity.accountID)
+        store.refresh(account.id)
+    }
+
     func perform(_ action: @escaping @MainActor () async throws -> Void) {
         guard !busy else { return }
         busy = true; message = LocalizedText("simulation.working", table: "Dialogs")
@@ -122,15 +132,36 @@ final class SimulationSession {
 private actor SimulationTransport: HTTPTransport {
     private var counts: [String: Int] = [:]
     private var failures: Set<String> = []
+    private var resetFailures: Set<String> = []
+    private var resetOnly: Set<String> = []
     func failNext(_ accountID: String) { failures.insert(accountID) }
+    func failNextReset(_ accountID: String) { resetFailures.insert(accountID) }
+    func resetOnlyNext(_ accountID: String) { resetOnly.insert(accountID) }
     func send(_ request: URLRequest) async throws -> HTTPResponse {
-        guard request.url?.absoluteString == "https://chatgpt.com/backend-api/wham/usage",
+        guard ["https://chatgpt.com/backend-api/wham/usage",
+               "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits"].contains(request.url?.absoluteString ?? ""),
+              request.httpMethod == "GET", request.httpBody == nil,
               let token = request.value(forHTTPHeaderField: "Authorization"), token.hasPrefix("Bearer simulation."),
               let accountID = request.value(forHTTPHeaderField: "ChatGPT-Account-Id"), accountID.hasPrefix("sim-") else {
             throw UsageError.invalidCredentials // Fail closed; there is no network fallback.
         }
         try await Task.sleep(for: .milliseconds(100))
+        if request.url?.path == "/backend-api/wham/rate-limit-reset-credits" {
+            if resetFailures.remove(accountID) != nil { return HTTPResponse(status: 503, data: Data()) }
+            let credits: [[String: Any]] = accountID == "sim-work" ? [] : [
+                ["status": "available", "expires_at": ISO8601DateFormatter().string(from: Date().addingTimeInterval(172800))],
+                ["status": "available", "expires_at": NSNull()],
+            ]
+            return HTTPResponse(status: 200, data: try JSONSerialization.data(withJSONObject: [
+                "account_id": accountID, "available_count": credits.count, "credits": credits,
+            ]))
+        }
         if failures.remove(accountID) != nil { return HTTPResponse(status: 503, data: Data()) }
+        if resetOnly.remove(accountID) != nil {
+            return HTTPResponse(status: 200, data: try JSONSerialization.data(withJSONObject: [
+                "account_id": accountID, "plan_type": "plus", "rate_limit": NSNull(), "credits": NSNull(),
+            ]))
+        }
         counts[accountID, default: 0] += 1
         let used = min(95, (accountID == "sim-work" ? 70 : 20) + (counts[accountID, default: 1] - 1) * 5)
         let now = Int(Date().timeIntervalSince1970)

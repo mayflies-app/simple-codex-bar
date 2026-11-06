@@ -54,6 +54,8 @@ Click a reset or update time to switch between relative times and local dates. I
 
 Readings are snapshots of the service response. Missing values remain unavailable. A failed refresh preserves the previous reading with a stale indicator; readings restored at startup have a cached indicator. The app displays current subscription limits without calculating costs or recording usage history.
 
+Each account card also shows available banked resets and the next expiry; hover over the expiry for the full list. Expired and non-available entries are excluded. A valid positive inventory can be displayed even when the service reports no quota windows or credit balance. An explicit zero is shown as zero alongside valid usage; a failed or incomplete inventory query is unavailable and preserves the main usage reading. Cached inventories retain the card's cached/stale indicator. All quota and reset queries are read-only: the app never uses resets or offers actions that change remote usage limits, credits or account usage state.
+
 ## Privacy
 
 Settings and the latest readings stay on the Mac. Authenticated requests go directly to OpenAI. Linked credentials remain read only; separate sign-ins use protected local files. The app has no telemetry and does not read conversations or browser cookies. See [Privacy](docs/privacy.md) for storage, permissions and account removal.

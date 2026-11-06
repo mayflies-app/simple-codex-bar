@@ -48,6 +48,11 @@
 "card.actions.label" = "Actions for %@";
 "card.plan.help" = "Current plan: %@\nPlan at sign-in: %@";
 "card.not.provided" = "Not provided";
+"card.banked.available" = "Banked resets: %@ available";
+"card.banked.unavailable" = "Banked resets: unavailable";
+"card.banked.expires" = "Next expiry: %@";
+"card.banked.expiryUnavailable" = "Expiry not provided";
+"card.banked.help" = "Read-only inventory. This app never uses resets or changes account usage limits. Hover over the expiry to see all available expiries.";
 "card.credits.help" = "Credits are shown in their original units, without conversion to a currency amount.";
 "card.managed" = "Signed in";
 "card.linked" = "Read-only link";

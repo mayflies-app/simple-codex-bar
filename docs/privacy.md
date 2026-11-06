@@ -35,8 +35,11 @@ Authenticated requests go directly to OpenAI:
 | Endpoint | Purpose |
 | --- | --- |
 | `https://chatgpt.com/backend-api/wham/usage` | Subscription limits and credits |
+| `https://chatgpt.com/backend-api/wham/rate-limit-reset-credits` | Read-only banked reset count and expiry inventory |
 | `https://chatgpt.com/backend-api/accounts/<accountId>/spend-controls/current-user/monthly-usage` | Optional workspace monthly-usage supplement |
 | `https://auth.openai.com/oauth/token` | Renew app-managed credentials |
+
+All usage and reset-inventory requests are bodyless GETs restricted to these query paths, scoped to the same authenticated account. The app never redeems resets or changes remote quota, credits or account usage state. App-managed OAuth credential renewal is a separate authentication operation; an inventory failure never triggers renewal. Reset-credit identifiers and service descriptions are not retained; the latest count and available expiries are included in the local usage cache.
 
 The HTTP session is ephemeral, stores no cookies or URL credentials and rejects redirects. Sign-in launches Codex CLI and its browser authentication flow. Usage endpoints are undocumented and may change. Missing usage stays unavailable; a failed optional supplement preserves the main reading.
 

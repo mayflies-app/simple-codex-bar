@@ -163,6 +163,12 @@ enum SimulationVerifier {
         try check(panel.isVisible, "Settings toggles and menu dismissal keep the status panel open")
         let personal = session.store.rows[0].account
         let work = session.store.rows[1].account
+        try await waitUntil { text("banked-resets-\(personal.id)", in: surface).contains("2") }
+        try check(text("banked-resets-\(personal.id)", in: surface) == "可用重置：2 次"
+                  && text("banked-resets-\(work.id)", in: surface) == "可用重置：0 次",
+                  "Banked reset counts appear as read-only text for positive and explicit zero inventories")
+        try check(text("banked-expiry-\(personal.id)", in: surface).contains("最近到期"),
+                  "Available banked resets show their next expiry")
         let originalAccounts = session.store.rows.map(\.account)
         let originalReadings = session.store.rows.map(\.snapshot)
         let originalCredentials = try await session.repository.readCredentials(personal).data
@@ -213,6 +219,10 @@ enum SimulationVerifier {
         try check(!containsChinese(activityText), "Activity and manual-refresh status change to English: \(activityText)")
         let weekly = text("window-title-\(work.id)-codex-weekly", in: surface)
         try check(!weekly.isEmpty && !containsChinese(weekly), "Existing usage window title changes to English")
+        try check(text("banked-resets-\(personal.id)", in: surface) == "Banked resets: 2 available"
+                  && text("banked-resets-\(work.id)", in: surface) == "Banked resets: 0 available"
+                  && text("banked-expiry-\(personal.id)", in: surface).contains("Next expiry"),
+                  "Banked reset count and expiry immediately switch to English without a request")
         try check(session.store.rows.map(\.account) == originalAccounts
                   && session.store.rows.map(\.snapshot) == beforeSwitch
                   && !session.store.isRefreshing && !refresh.automaticRefreshEnabled,
@@ -230,6 +240,25 @@ enum SimulationVerifier {
         try check(reloaded.rows.allSatisfy { $0.restoredFromCache }
                   && reloaded.rows.flatMap { $0.snapshot?.windows ?? [] }.allSatisfy { !containsChinese($0.displayTitle(in: .english)) },
                   "Persisted readings restore with English window titles")
+        try check(reloaded.rows[0].snapshot?.bankedResets?.availableCount(at: Date()) == 2,
+                  "Banked reset inventory survives cache reload without network access")
+        await session.failNextResetRefresh(personal)
+        await session.store.waitForRefreshes()
+        try await waitUntil { text("banked-resets-\(personal.id)", in: surface) == "Banked resets: unavailable" }
+        try check(session.store.rows[0].snapshot?.windows.isEmpty == false
+                  && session.store.rows[0].errorMessage == nil
+                  && text("banked-expiry-\(personal.id)", in: surface).isEmpty,
+                  "Supplement failure preserves main quota and shows unavailable rather than zero or an old expiry")
+        try NativeCapture.write(surface, to: output.appendingPathComponent("banked-resets-unavailable.png"))
+        await session.resetOnlyNextRefresh(personal)
+        await session.store.waitForRefreshes()
+        try await waitUntil { text("banked-resets-\(personal.id)", in: surface) == "Banked resets: 2 available" }
+        try check(session.store.rows[0].snapshot?.windows.isEmpty == true
+                  && session.store.rows[0].snapshot?.credits == nil && session.store.rows[0].errorMessage == nil
+                  && text("percentage-\(personal.id)-codex-session", in: surface).isEmpty
+                  && text("credits-\(personal.id)", in: surface).isEmpty,
+                  "Positive banked-only inventory is visible without invented quota windows or credit balance")
+        try NativeCapture.write(surface, to: output.appendingPathComponent("banked-resets-only.png"))
         if let suite = ProcessInfo.processInfo.environment["MACOS_LOCALIZATION_TEST_SUITE"],
            let defaults = UserDefaults(suiteName: suite) {
             try check(defaults.string(forKey: LanguageController.preferenceKey) == "en",

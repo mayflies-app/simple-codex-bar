@@ -7,7 +7,7 @@ private struct LoopbackTransport: HTTPTransport {
     func send(_ request: URLRequest) async throws -> HTTPResponse {
         // The production endpoint is fixed. Only this test adapter reroutes fake tokens to loopback.
         var request = request
-        request.url = base.appendingPathComponent("usage")
+        request.url = base.appendingPathComponent(request.url?.lastPathComponent == "rate-limit-reset-credits" ? "rate-limit-reset-credits" : "usage")
         return try await URLSessionTransport().send(request)
     }
 }

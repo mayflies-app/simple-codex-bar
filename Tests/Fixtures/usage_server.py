@@ -14,6 +14,14 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
+        if self.path == "/rate-limit-reset-credits":
+            body = b'{"available_count":0,"credits":[]}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self.path == "/redirect":
             self.send_response(302)
             self.send_header("Location", "/should-not-follow")
