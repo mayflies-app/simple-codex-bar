@@ -169,9 +169,9 @@ enum SimulationVerifier {
                   "Banked reset counts appear as read-only text for positive and explicit zero inventories")
         try check(text("banked-expiry-\(personal.id)", in: surface).contains("最近到期"),
                   "Available banked resets show their next expiry")
-        try await verifyBankedTooltip(account: personal, session: session, language: language.language,
-                                      panel: panel, surface: surface, output: output)
-        try check(true, "Hovering banked reset count and expiry shows every expiry in Chinese")
+        try await verifyBankedDateDisplay(account: personal, other: work, session: session, language: language.language,
+                                          dates: dates, panel: panel, surface: surface, output: output)
+        try check(true, "Banked expiry and hover lists follow the global date display in Chinese")
         let originalAccounts = session.store.rows.map(\.account)
         let originalReadings = session.store.rows.map(\.snapshot)
         let originalCredentials = try await session.repository.readCredentials(personal).data
@@ -226,9 +226,9 @@ enum SimulationVerifier {
                   && text("banked-resets-\(work.id)", in: surface) == "Banked resets: 0 available"
                   && text("banked-expiry-\(personal.id)", in: surface).contains("Next expiry"),
                   "Banked reset count and expiry immediately switch to English without a request")
-        try await verifyBankedTooltip(account: personal, session: session, language: language.language,
-                                      panel: panel, surface: surface, output: output)
-        try check(true, "Hovering banked reset count and expiry shows every expiry in English")
+        try await verifyBankedDateDisplay(account: personal, other: work, session: session, language: language.language,
+                                          dates: dates, panel: panel, surface: surface, output: output)
+        try check(true, "Banked expiry and hover lists follow the global date display in English")
         try check(session.store.rows.map(\.account) == originalAccounts
                   && session.store.rows.map(\.snapshot) == beforeSwitch
                   && !session.store.isRefreshing && !refresh.automaticRefreshEnabled,
@@ -1285,7 +1285,43 @@ enum SimulationVerifier {
             .write(to: file)
     }
 
-    private static func verifyBankedTooltip(account: Account, session: SimulationSession, language: AppLanguage,
+    private static func verifyBankedDateDisplay(account: Account, other: Account, session: SimulationSession,
+                                                language: AppLanguage, dates: DateDisplayController,
+                                                panel: NSPanel, surface: NSView, output: URL) async throws {
+        func text(_ identifier: String) -> String {
+            guard let element = find(identifier, in: surface, depth: 0) else { return "" }
+            return (value("accessibilityValue", of: element) as? String)
+                ?? (value("accessibilityLabel", of: element) as? String) ?? ""
+        }
+        let initialMode = dates.absolute
+        let readings = session.store.rows.map(\.snapshot)
+        defer { if dates.absolute != initialMode { dates.toggle() } }
+        let expiryID = "banked-expiry-\(account.id)"
+        if !dates.absolute { try press("absolute-dates", in: surface) }
+        try await waitUntil { dates.absolute && text(expiryID).contains("-") }
+        try await verifyBankedTooltip(account: account, session: session, language: language, absolute: true,
+                                      panel: panel, surface: surface, output: output)
+        try NativeCapture.write(surface, to: output.appendingPathComponent("\(language.rawValue)-banked-dates-absolute.png"))
+        try press("absolute-dates", in: surface)
+        try await waitUntil { !dates.absolute && text(expiryID).contains(language == .english ? "in " : "后") }
+        try await verifyBankedTooltip(account: account, session: session, language: language, absolute: false,
+                                      panel: panel, surface: surface, output: output)
+        try NativeCapture.write(surface, to: output.appendingPathComponent("\(language.rawValue)-banked-dates-relative.png"))
+        try press(expiryID, in: surface)
+        try await waitUntil { dates.absolute && text(expiryID).contains("-")
+            && text("reset-\(other.id)-codex-session").contains(language == .english ? "Resets at" : "重置于")
+            && text("updated-\(other.id)").contains("-") }
+        guard try settingState("absolute-dates", in: surface) else { throw CheckFailure("Expiry click did not update the global date setting") }
+        try press("updated-\(other.id)", in: surface)
+        try await waitUntil { !dates.absolute && text(expiryID).contains(language == .english ? "in " : "后") }
+        try press("reset-\(other.id)-codex-session", in: surface)
+        try await waitUntil { dates.absolute && text(expiryID).contains("-") }
+        guard session.store.rows.map(\.snapshot) == readings && !session.store.isRefreshing else {
+            throw CheckFailure("Date display changes must not fetch or alter account readings")
+        }
+    }
+
+    private static func verifyBankedTooltip(account: Account, session: SimulationSession, language: AppLanguage, absolute: Bool,
                                             panel: NSPanel, surface: NSView, output: URL) async throws {
         let expirations = session.store.rows.first { $0.id == account.id }?.snapshot?.bankedResets?
             .availableExpirations(at: Date()) ?? []
@@ -1311,10 +1347,21 @@ enum SimulationVerifier {
                 throw CheckFailure("Missing tooltip target: \(identifier)")
             }
             let help = value("accessibilityHelp", of: element) as? String ?? ""
-            let name = "\(language.rawValue)-\(prefix)-tooltip"
-            try JSONSerialization.data(withJSONObject: ["expected": expected, "actualHelp": help], options: [.prettyPrinted, .sortedKeys])
+            let name = "\(language.rawValue)-\(prefix)-tooltip-\(absolute ? "absolute" : "relative")"
+            try JSONSerialization.data(withJSONObject: ["expected": absolute ? expected : "Three numbered entries in relative time, including unknown expiry",
+                                                       "absolute": absolute, "actualHelp": help], options: [.prettyPrinted, .sortedKeys])
                 .write(to: output.appendingPathComponent(name + ".json"))
-            guard help == expected else { throw CheckFailure("Tooltip does not expose the complete expiry list: \(name)") }
+            if absolute {
+                guard help == expected else { throw CheckFailure("Tooltip does not expose the complete expiry list: \(name)") }
+            } else {
+                let lines = help.components(separatedBy: "\n")
+                let pattern = language == .english ? #"^[12]\. in \d+ (d \d+ hr|hr \d+ min|min)$"#
+                    : #"^[12]\. \d+ (天 \d+ 小时|小时 \d+ 分钟|分钟)后$"#
+                guard lines.count == 3, lines.prefix(2).allSatisfy({ $0.range(of: pattern, options: .regularExpression) != nil }),
+                      lines.last == (language == .english ? "3. Expiry not provided" : "3. 未提供到期时间") else {
+                    throw CheckFailure("Tooltip does not follow relative date display: \(name)")
+                }
+            }
 
             func move(to point: NSPoint) throws {
                 CGWarpMouseCursorPosition(CGPoint(x: point.x, y: desktopTop - point.y))

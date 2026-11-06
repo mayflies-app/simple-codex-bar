@@ -90,3 +90,7 @@
 "time.reset.days.hours" = "Resets in %@ d %@ hr";
 "time.reset.hours.minutes" = "Resets in %@ hr %@ min";
 "time.reset.minutes" = "Resets in %@ min";
+"time.expiry.pending" = "Expired";
+"time.expiry.days.hours" = "in %@ d %@ hr";
+"time.expiry.hours.minutes" = "in %@ hr %@ min";
+"time.expiry.minutes" = "in %@ min";

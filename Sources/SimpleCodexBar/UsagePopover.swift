@@ -315,7 +315,7 @@ private struct AccountCard: View {
                         if let date = window.resetsAt {
                             TimelineView(.periodic(from: .now, by: 60)) { context in
                                 Button { dates.toggle() } label: {
-                                    Text(dates.absolute ? text("time.reset.absolute", fullDate(date)) : resetLabel(date, now: context.date))
+                                    Text(dates.absolute ? text("time.reset.absolute", fullDate(date)) : countdownLabel(date, now: context.date, prefix: "time.reset"))
                                         .font(.system(size: 10)).foregroundStyle(.secondary)
                                 }
                                 .buttonStyle(.plain)
@@ -334,7 +334,7 @@ private struct AccountCard: View {
                 TimelineView(.periodic(from: .now, by: 60)) { context in
                     let expirations = snapshot.bankedResets?.availableExpirations(at: context.date) ?? []
                     let expiryList = expirations.enumerated().map { index, date in
-                        "\(index + 1). " + (date.map(fullDate) ?? text("card.banked.expiryUnavailable"))
+                        "\(index + 1). " + (date.map { expiryDate($0, now: context.date) } ?? text("card.banked.expiryUnavailable"))
                     }.joined(separator: "\n")
                     VStack(alignment: .leading, spacing: 3) {
                         Text(snapshot.bankedResets.map { text("card.banked.available", String($0.availableCount(at: context.date))) }
@@ -343,10 +343,19 @@ private struct AccountCard: View {
                             .accessibilityIdentifier("banked-resets-\(row.id)")
                             .help(expiryList)
                         if let first = expirations.first {
-                            Text(first.map { text("card.banked.expires", fullDate($0)) }
-                                 ?? text("card.banked.expiryUnavailable"))
-                                .accessibilityIdentifier("banked-expiry-\(row.id)")
-                                .help(expiryList)
+                            Group {
+                                if let date = first {
+                                    Button { dates.toggle() } label: {
+                                        Text(text("card.banked.expires", expiryDate(date, now: context.date)))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityHint(text("time.toggle.help"))
+                                } else {
+                                    Text(text("card.banked.expiryUnavailable"))
+                                }
+                            }
+                            .accessibilityIdentifier("banked-expiry-\(row.id)")
+                            .help(expiryList)
                         }
                     }
                     .font(.system(size: 10)).foregroundStyle(.secondary)
@@ -444,12 +453,16 @@ private struct AccountCard: View {
         return text("time.updated.days", integer(Int(seconds / 86400)))
     }
 
-    private func resetLabel(_ date: Date, now: Date) -> String {
+    private func expiryDate(_ date: Date, now: Date) -> String {
+        dates.absolute ? fullDate(date) : countdownLabel(date, now: now, prefix: "time.expiry")
+    }
+
+    private func countdownLabel(_ date: Date, now: Date, prefix: String) -> String {
         let remaining = date.timeIntervalSince(now)
-        guard remaining > 0 else { return text("time.reset.pending") }
+        guard remaining > 0 else { return text("\(prefix).pending") }
         let minutes = Int(ceil(remaining / 60))
-        if minutes >= 1440 { return text("time.reset.days.hours", integer(minutes / 1440), integer((minutes % 1440) / 60)) }
-        if minutes >= 60 { return text("time.reset.hours.minutes", integer(minutes / 60), integer(minutes % 60)) }
-        return text("time.reset.minutes", integer(minutes))
+        if minutes >= 1440 { return text("\(prefix).days.hours", integer(minutes / 1440), integer((minutes % 1440) / 60)) }
+        if minutes >= 60 { return text("\(prefix).hours.minutes", integer(minutes / 60), integer(minutes % 60)) }
+        return text("\(prefix).minutes", integer(minutes))
     }
 }

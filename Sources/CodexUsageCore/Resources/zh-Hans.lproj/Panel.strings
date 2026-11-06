@@ -90,3 +90,7 @@
 "time.reset.days.hours" = "%@ 天 %@ 小时后重置";
 "time.reset.hours.minutes" = "%@ 小时 %@ 分钟后重置";
 "time.reset.minutes" = "%@ 分钟后重置";
+"time.expiry.pending" = "已到期";
+"time.expiry.days.hours" = "%@ 天 %@ 小时后";
+"time.expiry.hours.minutes" = "%@ 小时 %@ 分钟后";
+"time.expiry.minutes" = "%@ 分钟后";

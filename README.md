@@ -50,7 +50,7 @@ Refresh every account with the header button or one account with its card button
 
 Each account also refreshes once at its reported reset time, without shifting its regular schedule. A successful reset-time reading updates the comparison baseline so new consumption is compared against the reset value; a failed reset-time request waits for its next regular refresh. Automatic refresh pauses during lock, sleep, inactive sessions, display sleep or five minutes without input. A closed lid pauses it unless an external display is awake. Returning refreshes only accounts whose individual schedules or reset deadlines are due. Manual refresh remains available with either the global or account switch turned off.
 
-Click a reset or update time to switch between relative times and local dates. In Settings, choose **简体中文** or **English** under **Interface Language** to update the interface immediately. **Launch at Login** uses macOS Login Items and may require approval in System Settings.
+Click a reset, banked-reset expiry or update time to switch between relative times and local dates. In Settings, choose **简体中文** or **English** under **Interface Language** to update the interface immediately. **Launch at Login** uses macOS Login Items and may require approval in System Settings.
 
 Readings are snapshots of the service response. Missing values remain unavailable. A failed refresh preserves the previous reading with a stale indicator; readings restored at startup have a cached indicator. The app displays current subscription limits without calculating costs or recording usage history.
 
