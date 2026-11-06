@@ -111,10 +111,10 @@ private actor ResetFetcher: UsageFetching {
     await fixture.store.waitForRefreshes()
     controller.handleWake()
     #expect(controller.refreshInterval(for: active) == .oneMinute)
-    #expect(controller.refreshInterval(for: stable) == .fifteenMinutes)
+    #expect(controller.refreshInterval(for: stable) == .fiveMinutes)
     #expect(controller.nextRefreshAt(for: active) == clock.date.addingTimeInterval(60))
-    #expect(controller.nextRefreshAt(for: stable) == clock.date.addingTimeInterval(900))
-    for interval in [RefreshInterval.twoMinutes, .fiveMinutes, .fifteenMinutes] {
+    #expect(controller.nextRefreshAt(for: stable) == clock.date.addingTimeInterval(300))
+    for interval in [RefreshInterval.twoMinutes, .fiveMinutes] {
         let next = try #require(controller.nextRefreshAt(for: active))
         clock.date = next
         scheduler.fireLatest()
@@ -123,12 +123,94 @@ private actor ResetFetcher: UsageFetching {
         #expect(controller.refreshInterval(for: active) == interval)
         #expect(await fixture.fetcher.ids().filter { $0 == stable }.count == 2)
     }
+    let activeNext = controller.nextRefreshAt(for: active)
+    clock.date = try #require(controller.nextRefreshAt(for: stable))
+    scheduler.fireLatest()
+    await fixture.store.waitForRefreshes()
+    controller.handleWake()
+    #expect(await fixture.fetcher.ids().filter { $0 == stable }.count == 3)
+    #expect(await fixture.fetcher.ids().filter { $0 == active }.count == 4)
+    #expect(controller.nextRefreshAt(for: active) == activeNext)
     await fixture.setUsage(92, for: active, at: clock.date)
     controller.refreshManually(active)
     await fixture.store.waitForRefreshes()
     controller.handleWake()
     #expect(controller.refreshInterval(for: active) == .oneMinute)
-    #expect(await fixture.fetcher.ids().filter { $0 == stable }.count == 2)
+    #expect(await fixture.fetcher.ids().filter { $0 == stable }.count == 3)
+}
+
+@Test(arguments: [0.0, 90.0]) @MainActor
+func quietAccountKeepsPollingAndAutomaticallyDetectsResumedUsage(used: Double) async throws {
+    let clock = TestClock(), scheduler = TestScheduler()
+    let fixture = try await ResetFixture(clock: clock, resets: [[]])
+    defer { fixture.cleanup() }
+    let id = fixture.accounts[0].id
+    await fixture.setUsage(used, for: id, at: clock.date)
+    let controller = RefreshController(defaults: nil, scheduler: scheduler, accountStore: fixture.store,
+                                       now: { clock.date })
+    controller.start()
+    defer { controller.stop() }
+    await fixture.store.waitForRefreshes()
+    controller.handleWake()
+    // An hour of unchanged readings must not leave a growing monitoring gap.
+    for attempt in 1...12 {
+        #expect(controller.nextRefreshAt(for: id) == clock.date.addingTimeInterval(300))
+        clock.advance(300)
+        scheduler.fireLatest()
+        await fixture.store.waitForRefreshes()
+        controller.handleWake()
+        #expect(await fixture.fetcher.ids().count == attempt + 1)
+    }
+    await fixture.setUsage(used + 1, for: id, at: clock.date.addingTimeInterval(300))
+    clock.advance(299)
+    scheduler.fireLatest()
+    await fixture.store.waitForRefreshes()
+    #expect(await fixture.fetcher.ids().count == 13)
+    clock.advance(1)
+    scheduler.fireLatest()
+    await fixture.store.waitForRefreshes()
+    controller.handleWake()
+    #expect(await fixture.fetcher.ids().count == 14)
+    #expect(fixture.store.rows[0].snapshot?.windows.first?.usedPercent == used + 1)
+    #expect(controller.refreshInterval(for: id) == .oneMinute)
+    #expect(controller.nextRefreshAt(for: id) == clock.date.addingTimeInterval(60))
+}
+
+@Test @MainActor func partialMonthlyReadingsAndQuotaChangesKeepAccurateAutomaticCadence() async throws {
+    let clock = TestClock(), scheduler = TestScheduler()
+    let fixture = try await ResetFixture(clock: clock, resets: [[]])
+    defer { fixture.cleanup() }
+    let id = fixture.accounts[0].id
+    func monthly(_ used: Double, limit: Double, balance: Double) -> UsageSnapshot {
+        UsageSnapshot(plan: "business", windows: [
+            UsageWindow(id: "monthly", title: "Monthly", usedPercent: used / limit * 100,
+                        resetsAt: nil, usedAmount: used, limitAmount: limit)
+        ], fetchedAt: clock.date, credits: .init(balance: balance, hasCredits: true, unlimited: false))
+    }
+    await fixture.fetcher.set(monthly(10, limit: 100, balance: 10), for: id)
+    let controller = RefreshController(defaults: nil, scheduler: scheduler, accountStore: fixture.store,
+                                       now: { clock.date })
+    controller.start()
+    defer { controller.stop() }
+    await fixture.store.waitForRefreshes()
+    controller.handleWake()
+    for step in 0..<3 {
+        // Quota adjustment and a top-up, a missing monthly reading, then actual consumption.
+        clock.advance(300)
+        let next = step == 0 ? monthly(10, limit: 50, balance: 20)
+            : step == 1 ? UsageSnapshot(plan: "business", windows: [], fetchedAt: clock.date,
+                credits: .init(balance: 20, hasCredits: true, unlimited: false))
+            : monthly(11, limit: 100, balance: 20)
+        await fixture.fetcher.set(next, for: id)
+        scheduler.fireLatest()
+        await fixture.store.waitForRefreshes()
+        controller.handleWake()
+        #expect(await fixture.fetcher.ids().count == step + 2)
+        #expect(fixture.store.rows[0].snapshot == next)
+        #expect(fixture.store.rows[0].errorMessage == nil)
+        #expect(controller.refreshInterval(for: id) == (step == 2 ? .oneMinute : .fiveMinutes))
+        #expect(controller.nextRefreshAt(for: id) == clock.date.addingTimeInterval(step == 2 ? 60 : 300))
+    }
 }
 
 @Test @MainActor func repeatedAccountFailuresBackOffWithoutDelayingHealthyAccountAndRecover() async throws {
@@ -287,6 +369,37 @@ func inactiveAccountsCatchUpOnceAndManualRefreshDoesNotShiftOtherAccounts(state:
     #expect(await fixture.fetcher.ids().count == 6)
 }
 
+@Test @MainActor func resetSampleUpdatesBaselineWithoutMovingRegularRefresh() async throws {
+    let clock = TestClock(), scheduler = TestScheduler()
+    let fixture = try await ResetFixture(clock: clock, resets: [[40]])
+    defer { fixture.cleanup() }
+    let id = fixture.accounts[0].id
+    let controller = RefreshController(defaults: nil, scheduler: scheduler, accountStore: fixture.store,
+                                       now: { clock.date })
+    controller.start()
+    defer { controller.stop() }
+    await fixture.store.waitForRefreshes()
+    await expectScheduledDelay(40, in: scheduler)
+    #expect(controller.nextRefreshAt(for: id) == clock.date.addingTimeInterval(40))
+    clock.advance(40)
+    await fixture.setUsage(0, for: id, at: clock.date)
+    scheduler.fireLatest()
+    await fixture.store.waitForRefreshes()
+    controller.handleWake()
+    #expect(await fixture.fetcher.ids().count == 2)
+    #expect(controller.refreshInterval(for: id) == .fiveMinutes)
+    #expect(controller.nextRefreshAt(for: id) == clock.date.addingTimeInterval(260))
+    clock.advance(260)
+    await fixture.setUsage(1, for: id, at: clock.date)
+    scheduler.fireLatest()
+    await fixture.store.waitForRefreshes()
+    controller.handleWake()
+    #expect(await fixture.fetcher.ids().count == 3)
+    #expect(fixture.store.rows[0].snapshot?.windows.first?.usedPercent == 1)
+    #expect(controller.refreshInterval(for: id) == .oneMinute)
+    #expect(controller.nextRefreshAt(for: id) == clock.date.addingTimeInterval(60))
+}
+
 @Test @MainActor func failedResetRefreshKeepsCachedReadingAndDoesNotRetryUntilRegularInterval() async throws {
     let clock = TestClock(), scheduler = TestScheduler()
     let fixture = try await ResetFixture(clock: clock, resets: [[40]])
@@ -361,7 +474,7 @@ func inactiveAccountsCatchUpOnceAndManualRefreshDoesNotShiftOtherAccounts(state:
     #expect(await fixture.fetcher.ids().count == 2)
     controller.setAutomaticRefreshEnabled(true)
     await fixture.store.waitForRefreshes()
-    await expectScheduledDelay(1800, in: scheduler)
+    await expectScheduledDelay(300, in: scheduler)
     scheduler.fireLatest(); controller.handleWake()
     await fixture.store.waitForRefreshes()
     #expect(await fixture.fetcher.ids().count == 3) // Reenabling retains the existing immediate refresh.
@@ -427,7 +540,7 @@ func resetCoincidingWithIntervalOrManualRefreshDoesNotDuplicateRequest(manual: B
     if manual { controller.refreshManually() }
     else { scheduler.fireLatest() }
     await fixture.store.waitForRefreshes()
-    await expectScheduledDelay(900, in: scheduler)
+    await expectScheduledDelay(300, in: scheduler)
     controller.handleWake(); scheduler.fireLatest()
     await fixture.store.waitForRefreshes()
     #expect(await fixture.fetcher.ids().count == 2)
@@ -491,7 +604,7 @@ func resetDuringInflightRequestWaitsForCompletionAndOnlyCatchesUpIfUnconfirmed(c
         while (await fixture.fetcher.ids().count) < 3 && Date() < deadline { await Task.yield() }
         await fixture.store.waitForRefreshes()
     }
-    await expectScheduledDelay(confirmed ? 900 : 300, in: scheduler)
+    await expectScheduledDelay(300, in: scheduler)
     controller.handleWake(); scheduler.fireLatest()
     await fixture.store.waitForRefreshes()
     #expect(await fixture.fetcher.ids().count == (confirmed ? 2 : 3))

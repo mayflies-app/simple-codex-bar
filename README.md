@@ -11,7 +11,7 @@ View Codex and ChatGPT subscription limits for multiple accounts from the macOS 
 - View remaining limits, reset times, plans and available credits.
 - Sign in separately or link existing Codex credentials with read-only access.
 - Name and reorder accounts, and control automatic refresh for each account.
-- Refresh manually or every 1, 2, 5, 15 or 30 minutes; the default is 5 minutes.
+- Refresh manually or automatically every 1–5 minutes, with failure backoff up to 30 minutes.
 - Pause automatic refresh while the Mac is inactive and retain the last successful readings.
 - Switch between relative times and local dates, English and Simplified Chinese, and enable Launch at Login.
 
@@ -46,9 +46,9 @@ Account menus provide rename, sign-in and removal. Use the arrows to change acco
 
 ### Refresh and settings
 
-Refresh every account with the header button or one account with its card button. Smart Refresh schedules each account independently, starting at 5 minutes. Usage changes shorten that account's interval to 1 minute; unchanged readings gradually slow it to 2, 5, 15 and at most 30 minutes. Failures back off independently without discarding valid readings or accelerating a quiet account. Each card shows its current interval beside its automatic-refresh switch. The former global fixed-interval setting is no longer used; adaptive state starts fresh when the app relaunches.
+Refresh every account with the header button or one account with its card button. Smart Refresh schedules each account independently, starting at 5 minutes. Increased usage or credit consumption shortens that account's interval to 1 minute; readings without new consumption gradually slow it to 2 and at most 5 minutes. Quiet accounts, including those reporting zero usage, keep polling every 5 minutes so resumed usage can be detected at the next successful refresh. Quota resets, credit top-ups and quota changes alone do not trigger faster polling. Raw usage counts take precedence over percentages when available; percentage-only comparisons require unchanged quota limits. Temporarily missing windows or balances retain their last observed scheduling baseline without filling in missing displayed values. Consecutive failures back off to 5, 15 and at most 30 minutes without discarding valid readings; a successful response returns to the 1–5 minute schedule. Each card shows its current interval beside its automatic-refresh switch. The former global fixed-interval setting is no longer used; adaptive state starts fresh when the app relaunches.
 
-Each account also refreshes once at its reported reset time, without shifting its regular schedule; a failed reset-time request waits for its next regular refresh. Automatic refresh pauses during lock, sleep, inactive sessions, display sleep or five minutes without input. A closed lid pauses it unless an external display is awake. Returning refreshes only accounts whose individual schedules or reset deadlines are due. Manual refresh remains available with either the global or account switch turned off.
+Each account also refreshes once at its reported reset time, without shifting its regular schedule. A successful reset-time reading updates the comparison baseline so new consumption is compared against the reset value; a failed reset-time request waits for its next regular refresh. Automatic refresh pauses during lock, sleep, inactive sessions, display sleep or five minutes without input. A closed lid pauses it unless an external display is awake. Returning refreshes only accounts whose individual schedules or reset deadlines are due. Manual refresh remains available with either the global or account switch turned off.
 
 Click a reset or update time to switch between relative times and local dates. In Settings, choose **简体中文** or **English** under **Interface Language** to update the interface immediately. **Launch at Login** uses macOS Login Items and may require approval in System Settings.
 

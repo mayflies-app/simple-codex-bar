@@ -186,7 +186,11 @@ public final class RefreshController {
             if let completion = row.completedRefreshID, completion == row.refreshAttemptID,
                !row.refreshing, completion != account.processedCompletion {
                 account.processedCompletion = completion
-                if !account.isResetRequest {
+                if account.isResetRequest {
+                    if row.errorMessage == nil, let snapshot = row.snapshot {
+                        account.policy.recordSupplemental(snapshot: snapshot)
+                    }
+                } else {
                     account.policy.record(snapshot: row.errorMessage == nil ? row.snapshot : nil)
                     account.nextRegularAt = date.addingTimeInterval(account.policy.interval.seconds)
                 }
