@@ -332,24 +332,25 @@ private struct AccountCard: View {
             }
             if let snapshot = row.snapshot {
                 TimelineView(.periodic(from: .now, by: 60)) { context in
+                    let expirations = snapshot.bankedResets?.availableExpirations(at: context.date) ?? []
+                    let expiryList = expirations.enumerated().map { index, date in
+                        "\(index + 1). " + (date.map(fullDate) ?? text("card.banked.expiryUnavailable"))
+                    }.joined(separator: "\n")
                     VStack(alignment: .leading, spacing: 3) {
                         Text(snapshot.bankedResets.map { text("card.banked.available", String($0.availableCount(at: context.date))) }
                              ?? text("card.banked.unavailable"))
                             .monospacedDigit()
                             .accessibilityIdentifier("banked-resets-\(row.id)")
-                        if let balance = snapshot.bankedResets,
-                           let first = balance.availableExpirations(at: context.date).first {
+                            .help(expiryList)
+                        if let first = expirations.first {
                             Text(first.map { text("card.banked.expires", fullDate($0)) }
                                  ?? text("card.banked.expiryUnavailable"))
                                 .accessibilityIdentifier("banked-expiry-\(row.id)")
-                                .help(balance.availableExpirations(at: context.date).map { date in
-                                    date.map { text("card.banked.expires", fullDate($0)) } ?? text("card.banked.expiryUnavailable")
-                                }.joined(separator: "\n"))
+                                .help(expiryList)
                         }
                     }
                     .font(.system(size: 10)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                    .help(text("card.banked.help"))
                 }
             }
             if let error = row.errorMessage {

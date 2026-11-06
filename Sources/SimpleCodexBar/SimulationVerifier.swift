@@ -163,12 +163,15 @@ enum SimulationVerifier {
         try check(panel.isVisible, "Settings toggles and menu dismissal keep the status panel open")
         let personal = session.store.rows[0].account
         let work = session.store.rows[1].account
-        try await waitUntil { text("banked-resets-\(personal.id)", in: surface).contains("2") }
-        try check(text("banked-resets-\(personal.id)", in: surface) == "可用重置：2 次"
+        try await waitUntil { text("banked-resets-\(personal.id)", in: surface).contains("3") }
+        try check(text("banked-resets-\(personal.id)", in: surface) == "可用重置：3 次"
                   && text("banked-resets-\(work.id)", in: surface) == "可用重置：0 次",
                   "Banked reset counts appear as read-only text for positive and explicit zero inventories")
         try check(text("banked-expiry-\(personal.id)", in: surface).contains("最近到期"),
                   "Available banked resets show their next expiry")
+        try await verifyBankedTooltip(account: personal, session: session, language: language.language,
+                                      panel: panel, surface: surface, output: output)
+        try check(true, "Hovering banked reset count and expiry shows every expiry in Chinese")
         let originalAccounts = session.store.rows.map(\.account)
         let originalReadings = session.store.rows.map(\.snapshot)
         let originalCredentials = try await session.repository.readCredentials(personal).data
@@ -219,10 +222,13 @@ enum SimulationVerifier {
         try check(!containsChinese(activityText), "Activity and manual-refresh status change to English: \(activityText)")
         let weekly = text("window-title-\(work.id)-codex-weekly", in: surface)
         try check(!weekly.isEmpty && !containsChinese(weekly), "Existing usage window title changes to English")
-        try check(text("banked-resets-\(personal.id)", in: surface) == "Banked resets: 2 available"
+        try check(text("banked-resets-\(personal.id)", in: surface) == "Banked resets: 3 available"
                   && text("banked-resets-\(work.id)", in: surface) == "Banked resets: 0 available"
                   && text("banked-expiry-\(personal.id)", in: surface).contains("Next expiry"),
                   "Banked reset count and expiry immediately switch to English without a request")
+        try await verifyBankedTooltip(account: personal, session: session, language: language.language,
+                                      panel: panel, surface: surface, output: output)
+        try check(true, "Hovering banked reset count and expiry shows every expiry in English")
         try check(session.store.rows.map(\.account) == originalAccounts
                   && session.store.rows.map(\.snapshot) == beforeSwitch
                   && !session.store.isRefreshing && !refresh.automaticRefreshEnabled,
@@ -240,7 +246,7 @@ enum SimulationVerifier {
         try check(reloaded.rows.allSatisfy { $0.restoredFromCache }
                   && reloaded.rows.flatMap { $0.snapshot?.windows ?? [] }.allSatisfy { !containsChinese($0.displayTitle(in: .english)) },
                   "Persisted readings restore with English window titles")
-        try check(reloaded.rows[0].snapshot?.bankedResets?.availableCount(at: Date()) == 2,
+        try check(reloaded.rows[0].snapshot?.bankedResets?.availableCount(at: Date()) == 3,
                   "Banked reset inventory survives cache reload without network access")
         await session.failNextResetRefresh(personal)
         await session.store.waitForRefreshes()
@@ -252,7 +258,7 @@ enum SimulationVerifier {
         try NativeCapture.write(surface, to: output.appendingPathComponent("banked-resets-unavailable.png"))
         await session.resetOnlyNextRefresh(personal)
         await session.store.waitForRefreshes()
-        try await waitUntil { text("banked-resets-\(personal.id)", in: surface) == "Banked resets: 2 available" }
+        try await waitUntil { text("banked-resets-\(personal.id)", in: surface) == "Banked resets: 3 available" }
         try check(session.store.rows[0].snapshot?.windows.isEmpty == true
                   && session.store.rows[0].snapshot?.credits == nil && session.store.rows[0].errorMessage == nil
                   && text("percentage-\(personal.id)-codex-session", in: surface).isEmpty
@@ -1277,6 +1283,57 @@ enum SimulationVerifier {
         let hierarchy = try withSettingsMenu(in: view) { entries($0) }
         try JSONSerialization.data(withJSONObject: ["nativeMenuItems": hierarchy], options: [.prettyPrinted, .sortedKeys])
             .write(to: file)
+    }
+
+    private static func verifyBankedTooltip(account: Account, session: SimulationSession, language: AppLanguage,
+                                            panel: NSPanel, surface: NSView, output: URL) async throws {
+        let expirations = session.store.rows.first { $0.id == account.id }?.snapshot?.bankedResets?
+            .availableExpirations(at: Date()) ?? []
+        guard expirations.count == 3 else { throw CheckFailure("Tooltip fixture must have three available resets") }
+        let formatter = DateFormatter()
+        formatter.locale = language.locale
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let expected = expirations.enumerated().map { index, date in
+            "\(index + 1). " + (date.map(formatter.string) ?? (language == .english ? "Expiry not provided" : "未提供到期时间"))
+        }.joined(separator: "\n")
+        let originalPointer = NSEvent.mouseLocation
+        let originalMouseEvents = panel.acceptsMouseMovedEvents
+        let desktopTop = NSScreen.screens.first?.frame.maxY ?? 0
+        defer {
+            panel.acceptsMouseMovedEvents = originalMouseEvents
+            CGWarpMouseCursorPosition(CGPoint(x: originalPointer.x, y: desktopTop - originalPointer.y))
+        }
+        panel.acceptsMouseMovedEvents = true
+        for prefix in ["banked-resets", "banked-expiry"] {
+            let identifier = "\(prefix)-\(account.id)"
+            guard let element = find(identifier, in: surface, depth: 0), let frame = accessibilityFrame(of: element) else {
+                throw CheckFailure("Missing tooltip target: \(identifier)")
+            }
+            let help = value("accessibilityHelp", of: element) as? String ?? ""
+            let name = "\(language.rawValue)-\(prefix)-tooltip"
+            try JSONSerialization.data(withJSONObject: ["expected": expected, "actualHelp": help], options: [.prettyPrinted, .sortedKeys])
+                .write(to: output.appendingPathComponent(name + ".json"))
+            guard help == expected else { throw CheckFailure("Tooltip does not expose the complete expiry list: \(name)") }
+
+            func move(to point: NSPoint) throws {
+                CGWarpMouseCursorPosition(CGPoint(x: point.x, y: desktopTop - point.y))
+                guard let event = NSEvent.mouseEvent(with: .mouseMoved, location: panel.convertPoint(fromScreen: point),
+                    modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: panel.windowNumber,
+                    context: nil, eventNumber: 0, clickCount: 0, pressure: 0) else { throw CheckFailure("Cannot create hover event") }
+                panel.sendEvent(event)
+            }
+            try move(to: NSPoint(x: panel.frame.minX + 2, y: panel.frame.minY + 2))
+            try await Task.sleep(for: .milliseconds(250))
+            try move(to: NSPoint(x: frame.midX, y: frame.midY))
+            var tooltip: NSWindow?
+            try await waitUntil {
+                tooltip = NSApp.windows.first { $0.isVisible && String(describing: type(of: $0)).lowercased().contains("tooltip") }
+                return tooltip != nil
+            }
+            guard let content = tooltip?.contentView else { throw CheckFailure("Native tooltip has no content") }
+            try NativeCapture.write(content, to: output.appendingPathComponent(name + ".png"))
+        }
     }
 
     private static func waitUntil(line: UInt = #line, _ condition: @MainActor () -> Bool) async throws {

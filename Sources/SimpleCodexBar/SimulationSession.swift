@@ -150,6 +150,7 @@ private actor SimulationTransport: HTTPTransport {
             if resetFailures.remove(accountID) != nil { return HTTPResponse(status: 503, data: Data()) }
             let credits: [[String: Any]] = accountID == "sim-work" ? [] : [
                 ["status": "available", "expires_at": ISO8601DateFormatter().string(from: Date().addingTimeInterval(172800))],
+                ["status": "available", "expires_at": ISO8601DateFormatter().string(from: Date().addingTimeInterval(345600))],
                 ["status": "available", "expires_at": NSNull()],
             ]
             return HTTPResponse(status: 200, data: try JSONSerialization.data(withJSONObject: [
