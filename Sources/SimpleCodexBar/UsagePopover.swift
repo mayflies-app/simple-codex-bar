@@ -334,7 +334,11 @@ private struct AccountCard: View {
                 TimelineView(.periodic(from: .now, by: 60)) { context in
                     let expirations = snapshot.bankedResets?.availableExpirations(at: context.date) ?? []
                     let expiryList = expirations.enumerated().map { index, date in
-                        "\(index + 1). " + (date.map { expiryDate($0, now: context.date) } ?? text("card.banked.expiryUnavailable"))
+                        let value = date.map { date in
+                            dates.absolute ? fullDate(date).replacingOccurrences(of: " ", with: "\t")
+                                : expiryDate(date, now: context.date)
+                        } ?? text("card.banked.expiryUnavailable")
+                        return "\(index + 1).\t\(value)"
                     }.joined(separator: "\n")
                     VStack(alignment: .leading, spacing: 3) {
                         Text(snapshot.bankedResets.map { text("card.banked.available", String($0.availableCount(at: context.date))) }

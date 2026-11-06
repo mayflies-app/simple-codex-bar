@@ -1329,9 +1329,9 @@ enum SimulationVerifier {
         let formatter = DateFormatter()
         formatter.locale = language.locale
         formatter.timeZone = .current
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.dateFormat = "yyyy-MM-dd\tHH:mm:ss"
         let expected = expirations.enumerated().map { index, date in
-            "\(index + 1). " + (date.map(formatter.string) ?? (language == .english ? "Expiry not provided" : "未提供到期时间"))
+            "\(index + 1).\t" + (date.map(formatter.string) ?? (language == .english ? "Expiry not provided" : "未提供到期时间"))
         }.joined(separator: "\n")
         let originalPointer = NSEvent.mouseLocation
         let originalMouseEvents = panel.acceptsMouseMovedEvents
@@ -1355,10 +1355,10 @@ enum SimulationVerifier {
                 guard help == expected else { throw CheckFailure("Tooltip does not expose the complete expiry list: \(name)") }
             } else {
                 let lines = help.components(separatedBy: "\n")
-                let pattern = language == .english ? #"^[12]\. in \d+ (d \d+ hr|hr \d+ min|min)$"#
-                    : #"^[12]\. \d+ (天 \d+ 小时|小时 \d+ 分钟|分钟)后$"#
+                let pattern = language == .english ? #"^[12]\.\tin \d+ (d \d+ hr|hr \d+ min|min)$"#
+                    : #"^[12]\.\t\d+ (天 \d+ 小时|小时 \d+ 分钟|分钟)后$"#
                 guard lines.count == 3, lines.prefix(2).allSatisfy({ $0.range(of: pattern, options: .regularExpression) != nil }),
-                      lines.last == (language == .english ? "3. Expiry not provided" : "3. 未提供到期时间") else {
+                      lines.last == (language == .english ? "3.\tExpiry not provided" : "3.\t未提供到期时间") else {
                     throw CheckFailure("Tooltip does not follow relative date display: \(name)")
                 }
             }
